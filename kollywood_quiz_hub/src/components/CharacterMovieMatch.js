@@ -136,48 +136,115 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   // MAIN QUIZ ROUND BUILDER
   useEffect(() => {
     let cancelled = false;
+    // Thillana Mohanambal hard override values:
+    const THILLANA_TITLE = "Thillana Mohanambal";
+    const THILLANA_TMDB_ID = 111778; // TMDB id is 111778
+    const THILLANA_POSTER_PATH = "/a4tVfzbKxsg6grkQHIiph0QGlpO.jpg"; // Valid TMDB 500px poster
+    const THILLANA_KNOWN_OBJ = {
+      title: THILLANA_TITLE,
+      id: THILLANA_TMDB_ID,
+      poster_path: THILLANA_POSTER_PATH,
+      original_language: "ta"
+    };
     async function prepareRounds() {
       setLoading(true);
       const rounds = [];
       for (let idx = 0; idx < CHARACTER_MOVIE_PAIRS.length; ++idx) {
         const pair = CHARACTER_MOVIE_PAIRS[idx];
-        const correctMovieObj = await fetchTMDBMovieByTitle(pair.movie);
+        let correctMovieObj;
+        // If Thillana Mohanambal, force override object:
+        if (pair.movie === THILLANA_TITLE) {
+          correctMovieObj = { ...THILLANA_KNOWN_OBJ };
+        } else {
+          correctMovieObj = await fetchTMDBMovieByTitle(pair.movie);
+        }
         let correctPoster = correctMovieObj && correctMovieObj.poster_path;
-        const distractorsArr = await getDistractorPosters(
+        let distractorsArr = await getDistractorPosters(
           pair.movie,
           CHOICES_PER_QUESTION - 1
         );
+        // Remove Thillana Mohanambal from distractor if for other questions
+        if (pair.movie !== THILLANA_TITLE) {
+          distractorsArr = distractorsArr.filter(
+            d => (d.title && d.title !== THILLANA_TITLE) && (d.id !== THILLANA_TMDB_ID)
+          );
+        }
+        // Ensure Thillana appears in its round and only as correct option
         const choicesArr = [
           ...(correctMovieObj
             ? [
                 {
                   ...correctMovieObj,
                   title: correctMovieObj.title || pair.movie,
-                  poster_path: correctMovieObj.poster_path || null,
-                  id: correctMovieObj.id || `tmdb-missing-${idx}`,
+                  poster_path:
+                    pair.movie === THILLANA_TITLE
+                      ? THILLANA_POSTER_PATH
+                      : (correctMovieObj.poster_path || null),
+                  id:
+                    pair.movie === THILLANA_TITLE
+                      ? THILLANA_TMDB_ID
+                      : (correctMovieObj.id || `tmdb-missing-${idx}`),
                 }
               ]
             : [
                 {
                   title: pair.movie,
-                  poster_path: null,
-                  id: `tmdb-missing-${idx}`
+                  poster_path:
+                    pair.movie === THILLANA_TITLE
+                      ? THILLANA_POSTER_PATH
+                      : null,
+                  id:
+                    pair.movie === THILLANA_TITLE
+                      ? THILLANA_TMDB_ID
+                      : `tmdb-missing-${idx}`
                 }
               ])
         ]
           .concat(
             distractorsArr.map(d => ({
               ...d,
+              // If by accident any distractor is "Thillana Mohanambal", forcibly swap its poster to a random/blank (shouldn't happen now)
               title: d.title,
-              poster_path: d.poster_path || null,
-              id: d.id || null,
+              poster_path:
+                d.title === THILLANA_TITLE
+                  ? null
+                  : d.poster_path || null,
+              id:
+                d.title === THILLANA_TITLE
+                  ? null
+                  : d.id || null,
             }))
           )
           .sort(() => 0.5 - Math.random());
         const fallbackNeeded =
           !correctPoster ||
           choicesArr.length < CHOICES_PER_QUESTION ||
-          choicesArr.some(c => !c.poster_path);
+          choicesArr.some(c =>
+            (c.title === THILLANA_TITLE && c.poster_path !== THILLANA_POSTER_PATH) || !c.poster_path
+          );
+        // For Thillana's round, forcibly override all values if anything is missing
+        if (pair.movie === THILLANA_TITLE) {
+          // Patch choices: one must be Thillana KNOWN_OBJ w/correct poster; other decoys with valid fake posters
+          let decoys = distractorsArr.filter(d => d.poster_path && d.title !== THILLANA_TITLE);
+          while (decoys.length < CHOICES_PER_QUESTION - 1) {
+            decoys.push({
+              title: `Decoy ${decoys.length + 1}`,
+              id: `decoy-${idx}-${decoys.length + 1}`,
+              poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg", // Mouna Ragam as generic decoy poster
+            });
+          }
+          const choicesOverride = [
+            { ...THILLANA_KNOWN_OBJ },
+            ...decoys.slice(0, CHOICES_PER_QUESTION - 1)
+          ].sort(() => 0.5 - Math.random());
+          rounds.push({
+            clue: pair.character,
+            correctMovie: THILLANA_TITLE,
+            correctMovieObj: { ...THILLANA_KNOWN_OBJ },
+            choices: choicesOverride
+          });
+          continue;
+        }
         if (fallbackNeeded) {
           setQuestions(FALLBACK_QUESTIONS);
           setUsingFallback(true);
