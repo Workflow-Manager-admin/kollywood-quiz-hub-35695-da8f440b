@@ -2,185 +2,143 @@ import React, { useState, useEffect, useRef } from "react";
 import QuizResult from "./QuizResult";
 
 /**
- * MovieSpinChallenge: Spin 3 wheels (hero, heroine, year released) from unique Kollywood movies,
- * prompt user to create or guess a matching movie, validate, and show result.
+ * MovieSpinChallenge (Real Kollywood Movie Triples Mode)
+ * - Fetches pool of Kollywood movies from TMDB.
+ * - Extracts only valid (Hero, Heroine, Year) triples that exist in real movies.
+ * - The "spin" can only land on an authentic triple, backed by a real TMDB Kollywood film.
+ * - Revealed answer is always a real movie matching the combo.
  * PUBLIC_INTERFACE
  */
+
+// TMDB Details
 const TMDB_API_KEY = "5bc67d3b06aecbd18121a3cbbc16eb59";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
-// --- Helper Functions ---
-
+// Utility: normalize for keys
 function normalize(str) {
   return (str || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// --- TMDB Fetch Helpers ---
+
 /**
- * Returns list of unique, "fresh" Kollywood movie objects, excluding titles in usedMovieSet.
- * @param {Set<string>} usedMovieSet Set of movie titles to exclude (normalized).
- * @param {number} n Limit on number of movies to fetch
- * @returns {Promise<Array>}
+ * Fetch Kollywood movies (Tamil, by language). Grabs up to nPages*20.
+ * Each movie comes as TMDB discover object.
  */
-async function fetchUniqueKollywoodMovies(usedMovieSet = new Set(), n = 20) {
-  let found = [];
-  let seen = new Set();
-  let page = 1;
-  let maxPages = 10;
-  while (found.length < n && page <= maxPages) {
+async function fetchKollywoodMoviesWithDetails(usedMovieSet = new Set(), nPages = 6) {
+  let kollyMovies = [];
+  let seenTitles = new Set();
+  for (let page = 1; page <= nPages; ++page) {
     const url = `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_original_language=ta&sort_by=popularity.desc&page=${page}`;
+    let resp;
     try {
-      const resp = await fetch(url);
-      if (!resp.ok) break;
+      resp = await fetch(url);
+      if (!resp.ok) continue;
       const data = await resp.json();
-      const results = (data.results || []).filter(
+      const validMovies = (data.results || []).filter(
         m =>
           m &&
+          m.id &&
           m.title &&
-          !usedMovieSet.has(normalize(m.title)) &&
-          !seen.has(normalize(m.title))
+          !usedMovieSet?.has?.(normalize(m.title)) &&
+          !seenTitles.has(normalize(m.title))
       );
-      results.forEach(m => {
-        found.push(m);
-        seen.add(normalize(m.title));
+      validMovies.forEach(m => {
+        kollyMovies.push(m);
+        seenTitles.add(normalize(m.title));
       });
     } catch (e) {
-      // Continue to next page
+      continue;
     }
-    page++;
   }
-  return found.slice(0, n); // Only as many as requested
-}
-
-/**
- * Returns TMDB movie details for movieId, including credits and keywords.
- * @returns {Promise<Object|null>}
- */
-async function fetchMovieFullDetails(movieId) {
-  const url = `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=credits,keywords`;
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
-    return await resp.json();
-  } catch (e) {
-    return null;
-  }
-}
-
-/**
- * For a batch of movies, fetch full details (credits, keywords, genres). Picks only up to maxn.
- * @returns {Promise<Array>} Array of detailed movie objects.
- */
-async function fetchMovieBatchFullDetails(movies, maxn = 20) {
-  // Up to maxn movies for this round, parallelized.
-  const result = [];
+  // Fetch full credits for each movie (limit for perf!)
+  const withDetails = [];
   await Promise.all(
-    movies.slice(0, maxn).map(async (m) => {
-      const d = await fetchMovieFullDetails(m.id);
-      if (d && d.credits && d.genres) {
-        result.push({
-          ...m,
-          fullDetails: d,
-        });
+    kollyMovies.slice(0, 48).map(async m => {
+      try {
+        const detailUrl = `${TMDB_BASE_URL}/movie/${m.id}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=credits`;
+        const resp = await fetch(detailUrl);
+        if (resp.ok) {
+          const details = await resp.json();
+          if (details && details.credits && details.credits.cast && details.release_date && details.title) {
+            withDetails.push({
+              id: m.id,
+              title: m.title,
+              release_date: details.release_date,
+              cast: details.credits.cast,
+              poster_path: details.poster_path,
+              details: details,
+            });
+          }
+        }
+      } catch {
+        // skip
       }
     })
   );
-  return result;
+  return withDetails;
 }
 
 /**
- * Extracts unique heroes, heroines, and release years from batch of full-detail movies.
- * Returns {heroes:[], heroines:[], years:[]}
+ * Given movies with cast detail, produce all possible (hero, heroine, year, movie) triples.
+ * Only include ones that have all 3 values present and valid.
+ * Returns: {triples: [...], tripleToMovie: {...}}
  */
-function extractSpinOptions(movies) {
-  const heroes = new Set();
-  const heroines = new Set();
-  const years = new Set();
-
-  for (const movieWithDetails of movies) {
-    const det = movieWithDetails.fullDetails;
-    // --- Hero (male lead) and Heroine (female lead) ---
-    if (det.credits && Array.isArray(det.credits.cast)) {
-      // Hero: first male actor in the cast (Kollywood typical order: male lead usually billed before female)
-      const hero = det.credits.cast.find(
-        (a) =>
-          a.gender === 2 && // male in TMDB API
-          a.known_for_department === "Acting" &&
-          a.order < 4 // usually top 4
-      );
-      if (hero && hero.name && hero.name.length > 1) heroes.add(hero.name.trim());
-
-      // Heroine: first female actor in the cast
-      const heroine = det.credits.cast.find(
-        (a) =>
-          a.gender === 1 && // female in TMDB API
-          a.known_for_department === "Acting" &&
-          a.order < 5 // be lenient
-      );
-      if (heroine && heroine.name && heroine.name.length > 1) heroines.add(heroine.name.trim());
+function buildValidMovieTriples(movies) {
+  const triples = [];
+  const tripleToMovie = {};
+  for (const movie of movies) {
+    let hero = null, heroine = null, year = null;
+    if (Array.isArray(movie.cast)) {
+      // Hero: first top-4 male actor, Heroine: first top-5 female actor (loose filter)
+      hero = movie.cast.find(a => a.gender === 2 && a.known_for_department === "Acting" && a.order < 4);
+      heroine = movie.cast.find(a => a.gender === 1 && a.known_for_department === "Acting" && a.order < 5);
     }
-    // --- Year Released ---
-    if (det.release_date && det.release_date.length >= 4) {
-      years.add(det.release_date.slice(0, 4));
+    if (movie.release_date && movie.release_date.length >= 4) {
+      year = movie.release_date.slice(0, 4);
+    }
+    if (hero && heroine && year && hero.name && heroine.name) {
+      const tripleObj = {
+        hero: hero.name.trim(),
+        heroine: heroine.name.trim(),
+        year,
+        movie
+      };
+      triples.push(tripleObj);
+      tripleToMovie[
+        normalize(hero.name.trim()) + "|" +
+        normalize(heroine.name.trim()) + "|" +
+        year
+      ] = movie;
     }
   }
-  // Turn to arrays & shuffle for more variety
-  function shuffle(arr) {
-    return arr.map(a => [a, Math.random()]).sort((a, b) => a[1] - b[1]).map(a => a[0]);
-  }
-  return {
-    heroes: shuffle(Array.from(heroes)),
-    heroines: shuffle(Array.from(heroines)),
-    years: shuffle(Array.from(years)),
-  };
+  return { triples, tripleToMovie };
 }
 
-// --- Persistent storage for past combos (for session) ---
-const STORAGE_KEY = "movieSpinPrevUsedTitles";
-function getPrevUsedSet() {
-  const j = window.localStorage.getItem(STORAGE_KEY);
-  if (j && Array.isArray(JSON.parse(j))) {
-    return new Set(JSON.parse(j).map(normalize));
-  }
-  return new Set();
-}
-function addMovieToPrevUsed(title) {
-  const curr = getPrevUsedSet();
-  curr.add(normalize(title));
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(curr)));
-}
-
-// --- Spinner Wheel component ---
-function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
-  // Visual "spinning" animation
+/** SpinnerWheel displays one property from the triple list (part: hero, heroine, year) */
+function SpinnerWheel({ triples, spinning, onEnd, selectedIdx, label, part }) {
   const [activeIdx, setActiveIdx] = useState(selectedIdx || 0);
   const intervalRef = useRef(null);
-
   useEffect(() => {
     if (spinning) {
       intervalRef.current = setInterval(() => {
-        setActiveIdx((prev) => (prev + 1) % items.length);
-      }, 65 + Math.random() * 18);
+        setActiveIdx((prev) => (prev + 1) % triples.length);
+      }, 60 + Math.random() * 18);
       return () => clearInterval(intervalRef.current);
     } else {
       setActiveIdx(selectedIdx || 0);
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
     // eslint-disable-next-line
-  }, [spinning, items.length, selectedIdx]);
+  }, [spinning, triples.length, selectedIdx]);
   useEffect(() => {
-    if (!spinning && onEnd) onEnd(items[activeIdx]);
+    if (!spinning && onEnd) onEnd(triples[activeIdx]);
     // eslint-disable-next-line
   }, [spinning]);
-  // Label = blue shade (kept), value = pure white with strong shadow if needed
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        width: 120,
-        padding: 0,
-        margin: 0,
+        display: "flex", flexDirection: "column", alignItems: "center", width: 120, padding: 0, margin: 0,
       }}
     >
       <div
@@ -216,13 +174,11 @@ function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
           letterSpacing: ".02em",
         }}
       >
-        {spinning && items.length > 0
-          ? items[activeIdx]
-          : items[selectedIdx || 0]}
+        {spinning && triples.length > 0
+          ? triples[activeIdx][part]
+          : triples[selectedIdx || 0]?.[part]}
       </div>
-      <div style={{ height: 18 }}>
-        {/* Extra mini text area for bonus info */}
-      </div>
+      <div style={{ height: 18 }}></div>
     </div>
   );
 }
@@ -232,263 +188,67 @@ function MovieSpinChallenge({ onBackToDashboard }) {
   // State
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [movies, setMovies] = useState([]); // pool of unique, fullData
-  const [spinOptions, setSpinOptions] = useState({
-    heroes: [],
-    heroines: [],
-    years: [],
-  });
-  // Wheel/spinning state
+  const [movieTriples, setMovieTriples] = useState([]); // Only valid triples, each { hero, heroine, year, movie }
+  const [tripleToMovie, setTripleToMovie] = useState({});
   const [spinning, setSpinning] = useState(false);
-  const [randomIdx, setRandomIdx] = useState({ hero: 0, heroine: 0, year: 0 });
-  const [finalCombo, setFinalCombo] = useState(null);
-  // Guess & Results
-  const [userInput, setUserInput] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [showResult, setShowResult] = useState(false);
-  const [matchingMovie, setMatchingMovie] = useState(null);
-  const [quizOver, setQuizOver] = useState(false);
+  const [activeSpinIdx, setActiveSpinIdx] = useState(0); // index to use for displaying
+  const [finalTriple, setFinalTriple] = useState(null);
+  const [showRevealPanel, setShowRevealPanel] = useState(false);
 
-  const prevUsedSet = getPrevUsedSet();
-
-  // On mount: load fresh Kollywood movies & details, extract wheels
+  // Fetch movies and build triple pool
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    async function init() {
       setLoading(true);
       setLoadError("");
-      setFinalCombo(null);
-      setShowResult(false);
-      setFeedback("");
-      setMatchingMovie(null);
-      let freshMovies = [];
+      setFinalTriple(null);
+      setShowRevealPanel(false);
       try {
-        freshMovies = await fetchUniqueKollywoodMovies(prevUsedSet, 16);
-        if (!freshMovies.length) throw new Error("No fresh Kollywood movies found.");
-      } catch (e) {
-        setLoadError("Failed to load movie options from TMDB.");
-        setLoading(false);
-        return;
-      }
-      // Now, fetch TMDB full details (credits, genres, keywords) for each
-      let moviesWithDetails = [];
-      try {
-        moviesWithDetails = await fetchMovieBatchFullDetails(freshMovies, 16);
-        if (!moviesWithDetails.length) throw new Error("Details fetch failed.");
-      } catch (e) {
-        setLoadError("Could not enrich movies with details.");
-        setLoading(false);
-        return;
-      }
-      // Now extract wheels (unique, shuffled)
-      const opts = extractSpinOptions(moviesWithDetails);
-      if (
-        opts.heroes.length < 2 ||
-        opts.heroines.length < 2 ||
-        opts.years.length < 2
-      ) {
-        setLoadError(
-          "Not enough hero/heroine/year release wheel options. Try again later."
-        );
-        setLoading(false);
-        return;
-      }
-      if (!cancelled) {
-        setMovies(moviesWithDetails);
-        setSpinOptions(opts);
+        const moviesWithDetails = await fetchKollywoodMoviesWithDetails(undefined, 6);
+        const { triples, tripleToMovie } = buildValidMovieTriples(moviesWithDetails);
+        if (triples.length < 2) {
+          setLoadError("Not enough valid Kollywood (hero, heroine, year) triples fetched from TMDB.");
+          setLoading(false);
+          return;
+        }
+        if (!cancelled) {
+          setMovieTriples(triples);
+          setTripleToMovie(tripleToMovie);
+          setLoading(false);
+        }
+      } catch (err) {
+        setLoadError("Error while loading Kollywood movies from TMDB.");
         setLoading(false);
       }
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line
+    init();
+    return () => { cancelled = true; };
   }, []);
 
-  // --- Handle spinning wheels ---
   function handleStartSpin() {
+    setShowRevealPanel(false);
+    setFinalTriple(null);
     setSpinning(true);
-    setShowResult(false);
-    setMatchingMovie(null);
-    setFeedback("");
-    // After 2.1 seconds, stop & pick at random
     setTimeout(() => {
-      const maxHero = Math.max(0, spinOptions.heroes.length - 1);
-      const maxHeroine = Math.max(0, spinOptions.heroines.length - 1);
-      const maxYear = Math.max(0, spinOptions.years.length - 1);
-      // Choose random indexes for each wheel
-      const heroIdx = Math.floor(Math.random() * (maxHero + 1));
-      const heroineIdx = Math.floor(Math.random() * (maxHeroine + 1));
-      const yearIdx = Math.floor(Math.random() * (maxYear + 1));
-      setRandomIdx({ hero: heroIdx, heroine: heroineIdx, year: yearIdx });
+      if (movieTriples.length < 1) { setSpinning(false); return; }
+      const idx = Math.floor(Math.random() * movieTriples.length);
+      setActiveSpinIdx(idx);
+      setFinalTriple(movieTriples[idx]);
       setSpinning(false);
-      setFinalCombo({
-        hero: spinOptions.heroes[heroIdx],
-        heroine: spinOptions.heroines[heroineIdx],
-        year: spinOptions.years[yearIdx],
-      });
-      setUserInput("");
-    }, 2100 + Math.random() * 280);
+    }, 2100 + Math.random() * 200);
   }
 
-  // --- Handle guess/create ---
-  async function handleUserSubmit(e) {
-    e.preventDefault();
-    setFeedback("");
-    setMatchingMovie(null);
-    // Search: check if any movie in pool matches combo AND matches user's guess (robust)
-    let comboMatch = null;
-    if (finalCombo && userInput && userInput.trim()) {
-      comboMatch = movies.find((movieWithDetails) => {
-        const t = (movieWithDetails.title || "") + " " + (movieWithDetails.fullDetails.title || "");
-        // require all 3 combo to be present in this movie
-        const det = movieWithDetails.fullDetails;
-        let isHero = false, isHeroine = false, isYear = false;
-        if (det.credits && Array.isArray(det.credits.cast)) {
-          isHero =
-            det.credits.cast.find(
-              (a) => a.gender === 2 && a.name === finalCombo.hero
-            ) !== undefined;
-          isHeroine =
-            det.credits.cast.find(
-              (a) => a.gender === 1 && a.name === finalCombo.heroine
-            ) !== undefined;
-        }
-        if (det.release_date && det.release_date.slice(0, 4) === finalCombo.year)
-          isYear = true;
-        // Allow for robust title matching (ignore case/punctuation)
-        const guessOk =
-          normalize(t) === normalize(userInput) ||
-          (userInput &&
-            normalize(movieWithDetails.title).includes(normalize(userInput)));
-        return isHero && isHeroine && isYear && guessOk;
-      });
-    }
-    // Also, get *a* matching movie from pool that fits combo (even if not user guess)
-    const fallbackAny = movies.find((movieWithDetails) => {
-      const det = movieWithDetails.fullDetails;
-      let isHero = false, isHeroine = false, isYear = false;
-      if (det.credits && Array.isArray(det.credits.cast)) {
-        isHero =
-          det.credits.cast.find(
-            (a) => a.gender === 2 && a.name === finalCombo.hero
-          ) !== undefined;
-        isHeroine =
-          det.credits.cast.find(
-            (a) => a.gender === 1 && a.name === finalCombo.heroine
-          ) !== undefined;
-      }
-      if (det.release_date && det.release_date.slice(0, 4) === finalCombo.year)
-        isYear = true;
-      return isHero && isHeroine && isYear;
-    });
-
-    if (comboMatch) {
-      // Correct!
-      setFeedback("✅ Correct! You matched all 3 wheels and guessed a real Kollywood movie!");
-      setMatchingMovie(comboMatch);
-      if (comboMatch.title) {
-        addMovieToPrevUsed(comboMatch.title);
-      }
-      setQuizOver(true);
-      setShowResult(true);
-    } else if (fallbackAny) {
-      setMatchingMovie(fallbackAny);
-      setFeedback(
-        "❌ There's no Kollywood movie in the list matching ALL 3 wheels and your guess, but here is a real match for inspiration:"
-      );
-      setQuizOver(false);
-      setShowResult(true);
-    } else {
-      setFeedback(
-        "❌ No Kollywood movie could be found that matches all 3 wheels, even with your guess. Try a different spin!"
-      );
-      setShowResult(true);
-    }
+  function handleRevealAnswer() {
+    setShowRevealPanel(true);
   }
-
   function resetGame() {
     window.location.reload();
   }
 
-  // --- Reveal Answer feature state ---
-  const [revealMovie, setRevealMovie] = useState(null);
-  const [showRevealHighlight, setShowRevealHighlight] = useState(false);
-
-  // Handler: Reveal the correct movie for current combo (find and highlight in UI)
-  function handleRevealAnswer() {
-    if (!finalCombo) return;
-    const match = movies.find((movieWithDetails) => {
-      const det = movieWithDetails.fullDetails;
-      let isHero = false, isHeroine = false, isYear = false;
-      if (det.credits && Array.isArray(det.credits.cast)) {
-        isHero =
-          det.credits.cast.find(
-            (a) => a.gender === 2 && a.name === finalCombo.hero
-          ) !== undefined;
-        isHeroine =
-          det.credits.cast.find(
-            (a) => a.gender === 1 && a.name === finalCombo.heroine
-          ) !== undefined;
-      }
-      if (det.release_date && det.release_date.slice(0, 4) === finalCombo.year)
-        isYear = true;
-      return isHero && isHeroine && isYear;
-    });
-    setRevealMovie(match || null);
-    setShowRevealHighlight(true);
-    setShowResult(false);
-    setFeedback("");
-    setMatchingMovie(match || null);
-  }
-
-  // --- Render UI ---
-  if (loading) {
-    return (
-      <div className="container" style={{ paddingTop: 120 }}>
-        <div>Loading fresh Kollywood movies &amp; options for the Movie Spin Challenge...</div>
-      </div>
-    );
-  }
-  if (loadError) {
-    return (
-      <div className="container" style={{ paddingTop: 120 }}>
-        <div style={{ color: "#e14747", marginBottom: 12 }}>
-          {loadError}
-        </div>
-        <button className="btn" onClick={resetGame}>
-          Retry
-        </button>
-        <button className="btn" style={{ marginLeft: 14 }} onClick={onBackToDashboard}>
-          ⬅ Back
-        </button>
-      </div>
-    );
-  }
-  if (showResult && quizOver) {
-    // Final result: Show feedback and solution
-    return (
-      <QuizResult
-        score={matchingMovie ? 1 : 0}
-        total={1}
-        answers={[
-          {
-            guess: userInput,
-            correct: matchingMovie?.title || "[No exact match in pool]",
-            wasCorrect: matchingMovie !== null && normalize(matchingMovie.title) === normalize(userInput),
-          },
-        ]}
-        onHome={onBackToDashboard}
-        game="Movie Spin Challenge"
-      />
-    );
-  }
-
-  // Highlighted reveal panel for visual clarity
+  // Panel: revealed movie for this combo
   function renderRevealPanel() {
-    if (!finalCombo || !showRevealHighlight) return null;
-    // If revealMovie is null, no such combo match exists
+    if (!showRevealPanel || !finalTriple) return null;
+    const movie = finalTriple.movie;
     return (
       <div
         style={{
@@ -510,16 +270,16 @@ function MovieSpinChallenge({ onBackToDashboard }) {
         <span role="img" aria-label="Reveal">🎬</span>{" "}
         <span style={{ color: "#ffe600", fontSize: 20, fontWeight: 900, textShadow: "0 1px 18px #333" }}>Correct Movie:</span>
         <br />
-        {revealMovie ? (
+        {movie ? (
           <>
             <span style={{ fontSize: 24, color: "#fff", fontWeight: 900, textShadow: "0 2px 8px #ffe500,0 2px 14px #000" }}>
-              {revealMovie.title}
+              {movie.title}
             </span>
-            {revealMovie.fullDetails && revealMovie.fullDetails.poster_path && (
+            {movie.poster_path && (
               <div style={{ marginTop: 8, marginBottom: 3 }}>
                 <img
-                  src={`https://image.tmdb.org/t/p/w185${revealMovie.fullDetails.poster_path}`}
-                  alt={`Poster for ${revealMovie.title}`}
+                  src={`https://image.tmdb.org/t/p/w185${movie.poster_path}`}
+                  alt={`Poster for ${movie.title}`}
                   style={{
                     width: 82,
                     height: 118,
@@ -544,19 +304,16 @@ function MovieSpinChallenge({ onBackToDashboard }) {
             >
               <b>Matched:</b>
               {" "}
-              <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalCombo.hero}</span>
+              <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalTriple.hero}</span>
               {" ● "}
-              <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalCombo.heroine}</span>
+              <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalTriple.heroine}</span>
               {" ● "}
-              <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalCombo.year}</span>
+              <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalTriple.year}</span>
             </div>
           </>
         ) : (
           <span style={{ fontSize: 18, color: "#ffe100", fontWeight: 700, textShadow: "0 1px 7px #00090a" }}>
-            No Kollywood movie from the grid matches <b>all three</b> of:<br />
-            <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalCombo.hero}</span> |{" "}
-            <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalCombo.heroine}</span> |{" "}
-            <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalCombo.year}</span>
+            No movie found for this triple. (Should never occur)
           </span>
         )}
         <div>
@@ -572,10 +329,7 @@ function MovieSpinChallenge({ onBackToDashboard }) {
               fontSize: "1.1rem",
               textShadow: "0 1px 13px #ffe20099, 0 2px 18px #0f0f1a",
             }}
-            onClick={() => {
-              setShowRevealHighlight(false);
-              setRevealMovie(null);
-            }}
+            onClick={() => setShowRevealPanel(false)}
           >
             Hide Answer
           </button>
@@ -584,6 +338,28 @@ function MovieSpinChallenge({ onBackToDashboard }) {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="container" style={{ paddingTop: 120 }}>
+        <div>Loading Kollywood movies &amp; real wheel options...</div>
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <div className="container" style={{ paddingTop: 120 }}>
+        <div style={{ color: "#e14747", marginBottom: 12 }}>
+          {loadError}
+        </div>
+        <button className="btn" onClick={resetGame}>
+          Retry
+        </button>
+        <button className="btn" style={{ marginLeft: 14 }} onClick={onBackToDashboard}>
+          ⬅ Back
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="container" style={{ paddingTop: 100, marginBottom: 36 }}>
       <button className="btn" style={{ marginBottom: 24 }} onClick={onBackToDashboard}>
@@ -603,12 +379,11 @@ function MovieSpinChallenge({ onBackToDashboard }) {
         fontWeight: 600,
         textShadow: "0 1px 8px #222, 0 1px 12px #6464649c",
       }}>
-        Spin three wheels to get a Kollywood <b>Hero</b>, <b>Heroine</b>, and <b>Year Released</b>.
-        Can you create or guess a Tamil movie that matches <b>all three</b>?<br />
-        <span style={{ color: "#fff", fontWeight: 400 }}>We&apos;ll check using TMDB data for only new, unused Kollywood movies!</span>
+        Spin the movie wheels! Every result is <b>guaranteed</b> to be a real Kollywood (Tamil) movie from TMDB—no impossible matches.
+        <br />
+        The triplet (Hero, Heroine, Year) you spin <b>will always correspond to an actual film</b>.
       </div>
-
-      {/* Main spinning-wheel row */}
+      {/* Main spinning wheels row — all three wheels will land on the same valid triple for display sync */}
       <div
         style={{
           display: "flex",
@@ -619,28 +394,31 @@ function MovieSpinChallenge({ onBackToDashboard }) {
         }}
       >
         <SpinnerWheel
-          items={spinOptions.heroes}
+          triples={movieTriples}
           spinning={spinning}
           onEnd={() => {}}
-          selectedIdx={randomIdx.hero}
+          selectedIdx={activeSpinIdx}
           label="Hero"
+          part="hero"
         />
         <SpinnerWheel
-          items={spinOptions.heroines}
+          triples={movieTriples}
           spinning={spinning}
           onEnd={() => {}}
-          selectedIdx={randomIdx.heroine}
+          selectedIdx={activeSpinIdx}
           label="Heroine"
+          part="heroine"
         />
         <SpinnerWheel
-          items={spinOptions.years}
+          triples={movieTriples}
           spinning={spinning}
           onEnd={() => {}}
-          selectedIdx={randomIdx.year}
+          selectedIdx={activeSpinIdx}
           label="Year Released"
+          part="year"
         />
       </div>
-      {/* Spin / re-spin button */}
+      {/* Spin button */}
       <div style={{ textAlign: "center", margin: "36px 0 14px" }}>
         <button
           className="btn btn-large"
@@ -661,13 +439,12 @@ function MovieSpinChallenge({ onBackToDashboard }) {
         >
           {spinning
             ? "Spinning..."
-            : finalCombo
+            : finalTriple
             ? "Spin Again!"
             : "Spin Wheels!"}
         </button>
       </div>
-      {/* Combo challenge prompt */}
-      {finalCombo && (
+      {finalTriple && (
         <div
           style={{
             background: "#232323",
@@ -691,26 +468,26 @@ function MovieSpinChallenge({ onBackToDashboard }) {
               color: "#24bec9", background: "#14232e", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
               fontWeight: 700, textShadow: "0 2px 10px #013, 0 1px 18px #1605"
             }}>
-              {finalCombo.hero}
+              {finalTriple.hero}
             </span>
             {" | "}
             <span style={{
               color: "#ffd700", background: "#524000", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
               fontWeight: 700, textShadow: "0 2px 13px #b36d05, 0 1px 18px #0008"
             }}>
-              {finalCombo.heroine}
+              {finalTriple.heroine}
             </span>
             {" | "}
             <span style={{
               color: "#fff", background: "#5f24ad", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
               fontWeight: 700, textShadow: "0 2px 11px #29014f, 0 1px 17px #2e0145"
             }}>
-              {finalCombo.year}
+              {finalTriple.year}
             </span>
           </span>
         </div>
       )}
-      {finalCombo && (
+      {finalTriple && (
         <div style={{ textAlign: "center", marginBottom: 16, marginTop: -9 }}>
           <button
             className="btn btn-large"
@@ -723,16 +500,15 @@ function MovieSpinChallenge({ onBackToDashboard }) {
               padding: "10px 24px",
               fontSize: "1.09rem"
             }}
-            disabled={spinning || showRevealHighlight}
+            disabled={spinning || showRevealPanel}
             onClick={handleRevealAnswer}
           >
-            Reveal Answer
+            Reveal Movie
           </button>
         </div>
       )}
-      {/* Revealed answer panel */}
+      {/* Revealed movie panel */}
       {renderRevealPanel()}
-      {/* (Input and guessing UI removed) */}
       <div style={{
         marginTop: 38,
         color: "#ffe800",
@@ -740,7 +516,7 @@ function MovieSpinChallenge({ onBackToDashboard }) {
         textAlign: "center",
         textShadow: "0 1px 7px #171918, 0 3px 13px #232222"
       }}>
-        Data &copy; TMDB. Only unused Kollywood movies are included in each play—once you match a movie, it vanishes from future spins!
+        All (Hero, Heroine, Year) wheel combinations are 100% guaranteed to be backed by a real Kollywood movie from TMDB.
       </div>
     </div>
   );
