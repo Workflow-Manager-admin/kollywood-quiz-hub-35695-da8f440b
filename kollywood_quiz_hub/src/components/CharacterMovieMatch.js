@@ -14,6 +14,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   // Fallback/demo questions for demo and offline
   // Thillana Mohanambal references have been removed.
   // Poster overrides for VIP, Gentleman, and Muthu are strictly enforced with correct TMDB Kollywood poster paths.
+  // Confirm all movie objects for these three have correct poster_path and TMDB IDs.
   const FALLBACK_QUESTIONS = [
     {
       clue: "mukundh varadharajan",
@@ -40,10 +41,10 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           id: "fallback3"
         },
         {
-          // Here, use correct Gentleman TMDB Kollywood poster
+          // Correct Gentleman TMDB Kollywood poster, correct ID
           title: "Gentleman",
           poster_path: "/6DTUYTzszbmWzxubUANWkPWWB6E.jpg",
-          id: 97596 // Correct TMDB ID for Gentleman
+          id: 97596
         }
       ]
     },
@@ -52,7 +53,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       correctMovie: "Muthu",
       correctMovieObj: {
         title: "Muthu",
-        poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg",
+        poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg", // ID 109007
         id: 109007
       },
       choices: [
@@ -83,7 +84,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       correctMovie: "VIP",
       correctMovieObj: {
         title: "VIP",
-        poster_path: "/gQjF5E3w05QGeeQjRgdvnNZNTKk.jpg",
+        poster_path: "/gQjF5E3w05QGeeQjRgdvnNZNTKk.jpg", // ID 278788
         id: 278788
       },
       choices: [
@@ -143,14 +144,13 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Chitti", movie: "Enthiran" },
     { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
     { character: "Velu Naicker", movie: "Nayakan" },
-    { character: "Gentleman", movie: "Gentleman" }, // Correctly configured; Thillana Mohanambal removed
-    { character: "Muthu", movie: "Muthu" }, // No reference to Thillana Mohanambal anywhere
+    { character: "Gentleman", movie: "Gentleman" }, // Ensured correct poster/ID
+    { character: "Muthu", movie: "Muthu" },
     { character: "Maari", movie: "Maari" },
     { character: "Subramani", movie: "Mouna Ragam" },
     { character: "Dhanush", movie: "VIP" },
     { character: "Nallasivam", movie: "Anbe Sivam" },
     { character: "Rangasamy", movie: "Sivaji" }
-    // No Thillana Mohanambal, no fallback reference, as required
   ];
 
   // State
@@ -206,21 +206,21 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   const VIP_OVERRIDE = {
     title: "VIP",
     id: 278788,
-    poster_path: "/gQjF5E3w05QGeeQjRgdvnNZNTKk.jpg", // Correct Kollywood poster TMDB
+    poster_path: "/gQjF5E3w05QGeeQjRgdvnNZNTKk.jpg", // TMDB Kollywood official
     original_language: "ta",
   };
   // Gentleman (1993) - ID: 97596
   const GENTLEMAN_OVERRIDE = {
     title: "Gentleman",
     id: 97596,
-    poster_path: "/6DTUYTzszbmWzxubUANWkPWWB6E.jpg", // Correct Kollywood poster TMDB
+    poster_path: "/6DTUYTzszbmWzxubUANWkPWWB6E.jpg", // TMDB Kollywood official
     original_language: "ta",
   };
   // Muthu (Rajinikanth, 1995) - ID: 109007
   const MUTHU_OVERRIDE = {
     title: "Muthu",
     id: 109007,
-    poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg", // Correct Kollywood poster TMDB
+    poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg", // TMDB Kollywood official
     original_language: "ta",
   };
 
