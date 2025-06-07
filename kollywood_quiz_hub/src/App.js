@@ -1,88 +1,74 @@
-import React, { useEffect, useState } from 'react';
-import './App.css';
-import { fetchKollywoodMovies } from './api/tmdb';
+import React, { useState } from "react";
+import "./App.css";
+
+// Component imports
+import Login from "./components/Login";
+import Dashboard from "./components/Dashboard";
+import BlurredPosterQuiz from "./components/BlurredPosterQuiz";
+import CharacterMovieMatch from "./components/CharacterMovieMatch";
+import MysteryMovieDetective from "./components/MysteryMovieDetective";
+import MovieBingo from "./components/MovieBingo";
+import EmojiMovieQuiz from "./components/EmojiMovieQuiz";
 
 function App() {
-  // Store movies in state
-  const [kollywoodMovies, setKollywoodMovies] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  // App navigation state
+  const [username, setUsername] = useState(null);
+  const [screen, setScreen] = useState("login"); // login, dashboard, game keys...
 
-  // Demo: Fetch Tamil movies when component mounts
-  useEffect(() => {
-    setLoading(true);
-    fetchKollywoodMovies()
-      .then(movies => {
-        setKollywoodMovies(movies.slice(0, 5)); // Show top 5 for demo
-        setLoading(false);
-      })
-      .catch(e => {
-        setError(e.message || 'Error fetching movies');
-        setLoading(false);
-      });
-  }, []);
+  // Handle login
+  function handleLogin(name) {
+    setUsername(name);
+    setScreen("dashboard");
+  }
+
+  function handleGameSelect(gameKey) {
+    setScreen(gameKey);
+  }
+
+  function handleBackToDashboard() {
+    setScreen("dashboard");
+  }
+
+  // Navigation mapping (gameKey -> component)
+  const GAME_COMPONENTS = {
+    blurredPoster: <BlurredPosterQuiz onBackToDashboard={handleBackToDashboard} />,
+    characterMatch: <CharacterMovieMatch onBackToDashboard={handleBackToDashboard} />,
+    mysteryDetective: <MysteryMovieDetective onBackToDashboard={handleBackToDashboard} />,
+    movieBingo: <MovieBingo onBackToDashboard={handleBackToDashboard} />,
+    emojiQuiz: <EmojiMovieQuiz onBackToDashboard={handleBackToDashboard} />,
+  };
 
   return (
     <div className="app">
+      {/* NavBar */}
       <nav className="navbar">
         <div className="container">
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
             <div className="logo">
-              <span className="logo-symbol">*</span> KAVIA AI
+              <span className="logo-symbol">🎬</span> Kollywood Quiz Hub
             </div>
-            <button className="btn">Template Button</button>
+            <div>
+              {username &&
+                <span style={{ color: "var(--base-light)", fontWeight: 500, fontSize: 16 }}>
+                  {username}
+                </span>
+              }
+            </div>
           </div>
         </div>
       </nav>
 
       <main>
-        <div className="container">
-          <div className="hero">
-            <div className="subtitle">AI Workflow Manager Template</div>
-            <h1 className="title">kollywood_quiz_hub</h1>
-            <div className="description">
-              Start building your application.
-            </div>
-            <button className="btn btn-large">Button</button>
+        {/* LOGIN */}
+        {screen === "login" && <Login onLogin={handleLogin} />}
 
-            {/* Demo Block: Kollywood movies fetched from TMDB */}
-            <div style={{ marginTop: 40, width: "100%", textAlign: "left" }}>
-              <h2 style={{ color: "var(--base-light)" }}>Trending Kollywood (Tamil) Movies <span role="img" aria-label="film">🎬</span></h2>
-              {loading && <div>Loading movies...</div>}
-              {error && <div style={{ color: 'red' }}>{error}</div>}
-              {!loading && !error && kollywoodMovies.length === 0 && (
-                <div>No movies found!</div>
-              )}
-              <ul style={{ paddingLeft: 0, margin: 0, listStyle: 'none' }}>
-                {kollywoodMovies.map((movie) => (
-                  <li key={movie.id} style={{
-                    marginBottom: 18,
-                    background: 'rgba(0,0,0,0.11)',
-                    padding: 12,
-                    borderRadius: 6,
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    {movie.poster_path && (
-                      <img
-                        src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`}
-                        alt={movie.title}
-                        style={{ marginRight: 14, borderRadius: 3, width: 52 }}
-                      />
-                    )}
-                    <div>
-                      <b>{movie.title}</b><br />
-                      <span style={{ fontSize: '0.95em', color: 'var(--text-secondary)' }}>
-                        Released: {movie.release_date || 'N/A'}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            {/* End demo block */}
-          </div>
-        </div>
+        {/* DASHBOARD */}
+        {screen === "dashboard" && <Dashboard username={username} onGameSelect={handleGameSelect} />}
+
+        {/* GAME SCREENS */}
+        {Object.keys(GAME_COMPONENTS).map(
+          (key) => screen === key ? <React.Fragment key={key}>{GAME_COMPONENTS[key]}</React.Fragment> : null
+        )}
       </main>
     </div>
   );
