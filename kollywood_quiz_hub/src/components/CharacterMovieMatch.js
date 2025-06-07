@@ -9,18 +9,9 @@ import QuizResult from "./QuizResult";
  */
 function CharacterMovieMatch({ onBackToDashboard }) {
   const QUESTIONS = 10;
-  const [questions, setQuestions] = useState([]);
-  const [step, setStep] = useState(0);
-  const [userAnswers, setUserAnswers] = useState([]);
-  const [selectedMovie, setSelectedMovie] = useState("");
-  const [draggedChar, setDraggedChar] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [quizOver, setQuizOver] = useState(false);
-
-  // Fix: make sure hooks are always called unconditionally, at the top:
-  const [reveal, setReveal] = useState(false);
-  const [justRevealed, setJustRevealed] = useState(false);
-  // Sample characters. In real app, would fetch credits+characters from TMDB, here is stub:
+  // How many choices per question (including the correct one)
+  const CHOICES_PER_QUESTION = 3;
+  // Static (stub) list of characters matched to movies
   const CHARACTERS = [
     { name: "Vikram", movies: ["Anniyan", "I"] },
     { name: "Chitti", movies: ["Enthiran", "2.0"] },
@@ -34,49 +25,125 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { name: "Velu Naicker", movies: ["Nayakan"] },
   ];
 
+  const [questions, setQuestions] = useState([]);
+  const [step, setStep] = useState(0);
+  const [userAnswers, setUserAnswers] = useState([]);
+  const [selectedMovie, setSelectedMovie] = useState("");
+  const [draggedChar, setDraggedChar] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [quizOver, setQuizOver] = useState(false);
+  const [reveal, setReveal] = useState(false);
+  const [justRevealed, setJustRevealed] = useState(false);
+
+  // PUBLIC_INTERFACE
   useEffect(() => {
     setLoading(true);
     fetchKollywoodMovies()
-      .then((all) => {
-        // Step 1: For eligible TMDB movies, find those with a known CHARACTERS mapping
-        const matchedPairs = [];
-        all.forEach(movie => {
-          const charObj = CHARACTERS.find((c) => c.movies.includes(movie.title));
-          if (charObj) {
-            matchedPairs.push({
-              character: charObj.name,
-              movie: movie.title,
-              movieObj: movie
-            });
-          }
+      .then((allMovies) => {
+        // Build all possible character-movie pairs where the movie exists in the TMDB response
+        const validPairs = [];
+        // For fast lookup
+        const movieTitleToObj = {};
+        allMovies.forEach((movie) => {
+          movieTitleToObj[movie.title] = movie;
         });
 
-        // Step 2: Shuffle and pick QUESTIONS count pairs
-        let qs;
-        if (matchedPairs.length >= QUESTIONS) {
-          qs = matchedPairs.sort(() => 0.5 - Math.random()).slice(0, QUESTIONS);
-        } else {
-          // If not enough matches (rare), fill remaining with randoms but guarantee mapping
-          const extraNeeded = QUESTIONS - matchedPairs.length;
-          qs = [...matchedPairs];
-          // Pick movies from all without repeats, assign CHARACTERS round-robin
-          let alreadyUsed = new Set(qs.map(q => q.movie));
-          let index = 0;
-          for (let i = 0; i < all.length && qs.length < QUESTIONS; ++i) {
-            const movie = all[i];
-            if (!alreadyUsed.has(movie.title)) {
-              const charIdx = index % CHARACTERS.length;
-              qs.push({
-                character: CHARACTERS[charIdx].name,
-                movie: movie.title,
-                movieObj: movie
+        CHARACTERS.forEach((char) => {
+          char.movies.forEach((mov) => {
+            if (movieTitleToObj[mov]) {
+              validPairs.push({
+                character: char.name,
+                movie: mov,
+                movieObj: movieTitleToObj[mov],
               });
-              alreadyUsed.add(movie.title);
-              index++;
+            }
+          });
+        });
+
+        // Shuffle pairs, select up to QUESTIONS
+        const shuffledPairs = validPairs.sort(() => 0.5 - Math.random()).slice(0, QUESTIONS);
+
+        // If too few pairs, fill with random extra pairs
+        let resultQuestions = [...shuffledPairs];
+        if (resultQuestions.length < QUESTIONS) {
+          // Pick from allMovies that aren't already included
+          const usedMovieNames = new Set(resultQuestions.map(q => q.movie));
+          let charIdx = 0;
+          for (let i = 0; i < allMovies.length && resultQuestions.length < QUESTIONS; ++i) {
+            const movie = allMovies[i];
+            if (!usedMovieNames.has(movie.title)) {
+              // Rotate through CHARACTERS to assign, or fallback to dummy
+              const ch = CHARACTERS[charIdx % CHARACTERS.length];
+              resultQuestions.push({
+                character: ch.name,
+                movie: movie.title,
+                movieObj: movie,
+              });
+              usedMovieNames.add(movie.title);
+              charIdx++;
             }
           }
         }
-        setQuestions(qs);
+
+        // For each question, build the option set: correct movie + random distractors
+        const buildChoicesForQuestions = () => {
+          // Avoid repeats (do not use correct movie as a distractor in the same question)
+          const allPool = allMovies.filter(m =>
+            m.poster_path && m.title // Make sure some poster and title exist
+          );
+          // fallback: if not enough with posters, allow any
+          function getDistractors(correctMovieTitle) {
+            // Pick random movies (not correct answer) from allPool
+            const distractors = [];
+            const shuffled = allPool
+              .filter(m => m.title !== correctMovieTitle)
+              .sort(() => 0.5 - Math.random());
+            for (let i = 0; i < shuffled.length && distractors.length < CHOICES_PER_QUESTION - 1; ++i) {
+              // Avoid blank/duplicate posters in same set
+              if (!distractors.find(d => d.title === shuffled[i].title)) {
+                distractors.push({
+                  movie: shuffled[i].title,
+                  movieObj: shuffled[i],
+                });
+              }
+            }
+            return distractors;
+          }
+
+          return resultQuestions.map((qInfo) => {
+            const correctOption = {
+              movie: qInfo.movie,
+              movieObj: qInfo.movieObj,
+            };
+            // Select distractors
+            let distractors = getDistractors(qInfo.movie);
+            // If not enough distractors, fallback to others (even without posters)
+            if (distractors.length < CHOICES_PER_QUESTION - 1) {
+              const others = allMovies
+                .filter(m => m.title !== qInfo.movie)
+                .filter(m => !distractors.find(d => d.movie === m.title))
+                .sort(() => 0.5 - Math.random());
+              for (let i = 0; i < others.length && distractors.length < CHOICES_PER_QUESTION - 1; ++i) {
+                distractors.push({
+                  movie: others[i].title,
+                  movieObj: others[i],
+                });
+              }
+            }
+            // Always have correct + distractors
+            const choices = [correctOption, ...distractors];
+            // Shuffle for display
+            const shuffledOpts = choices.sort(() => 0.5 - Math.random()).slice(0, CHOICES_PER_QUESTION);
+            return {
+              character: qInfo.character,
+              correctMovie: qInfo.movie, // title string
+              correctMovieObj: qInfo.movieObj,
+              choices: shuffledOpts,
+            };
+          });
+        };
+
+        setQuestions(buildChoicesForQuestions());
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -93,31 +160,15 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       ...userAnswers,
       {
         guessedMovie: selectedMovie,
-        actualMovie: questions[step].movie,
-        wasCorrect:
-          selectedMovie === questions[step].movie,
+        actualMovie: questions[step].correctMovie,
+        wasCorrect: selectedMovie === questions[step].correctMovie,
         character: questions[step].character,
-      }
+      },
     ]);
     setSelectedMovie("");
     if (step + 1 === QUESTIONS) setQuizOver(true);
     else setStep(step + 1);
   }
-
-  if (loading) return <div className="container" style={{ paddingTop: 120 }}>Loading...</div>;
-  if (quizOver)
-    return (
-      <QuizResult
-        score={userAnswers.filter((a) => a.wasCorrect).length}
-        total={QUESTIONS}
-        answers={userAnswers}
-        onHome={onBackToDashboard}
-        game="Character-Movie Match"
-      />
-    );
-  if (!questions[step]) return null;
-
-  // (Hooks for reveal state are already correctly declared at the top)
 
   function handleReveal() {
     setReveal(true);
@@ -125,7 +176,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       ...userAnswers,
       {
         guessedMovie: "",
-        actualMovie: questions[step].movie,
+        actualMovie: questions[step].correctMovie,
         wasCorrect: false,
         character: questions[step].character,
         revealed: true
@@ -141,9 +192,20 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }, 1800);
   }
 
-    // (removed duplicate hook declarations; hooks are already at the top unconditionally)
+  if (loading) return <div className="container" style={{ paddingTop: 120 }}>Loading...</div>;
+  if (quizOver)
+    return (
+      <QuizResult
+        score={userAnswers.filter((a) => a.wasCorrect).length}
+        total={QUESTIONS}
+        answers={userAnswers}
+        onHome={onBackToDashboard}
+        game="Character-Movie Match"
+      />
+    );
+  if (!questions[step]) return null;
 
-  // Drag-and-drop placeholders
+  // Display question: show the character and randomized movie choices; correct answer MUST always be present among the choices.
   return (
     <div className="container" style={{ paddingTop: 100 }}>
       <button className="btn" style={{ marginBottom: 24 }} onClick={onBackToDashboard}>
@@ -154,7 +216,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         Character-Movie Match
       </h2>
       <div className="description" style={{ marginBottom: 18 }}>
-        Drag the character to the correct Kollywood movie.
+        Match the Kollywood character to their movie (by dragging or clicking).
       </div>
       <div style={{
         display: "flex",
@@ -183,113 +245,86 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           justifyContent: "center",
           flexWrap: "wrap"
         }}>
-          {/* Construct movie choices with poster */}
-          {(() => {
-            // Compose current and distractor movies, with their objects
-            const real = questions[step];
-            // Get next 2 random distractor movies if available, or fallback to previous
-            const distractors = [];
-            // Avoid picking duplicate movies
-            let grabbed = new Set();
-            grabbed.add(real.movie);
-
-            // Prefer distinct distractors
-            for (let i = step + 1; i < questions.length && distractors.length < 2; ++i) {
-              if (!grabbed.has(questions[i].movie)) {
-                distractors.push(questions[i]);
-                grabbed.add(questions[i].movie);
-              }
-            }
-            for (let i = 0; i < questions.length && distractors.length < 2; ++i) {
-              if (!grabbed.has(questions[i].movie)) {
-                distractors.push(questions[i]);
-                grabbed.add(questions[i].movie);
-              }
-            }
-
-            // All options
-            const options = [real, ...distractors].sort(() => 0.5 - Math.random());
-
-            return options.map(opt => (
-              <div
-                key={opt.movie}
-                onDrop={e => { handleDrop(opt.movie, e); setDraggedChar(null); }}
-                onDragOver={e => e.preventDefault()}
-                tabIndex={0}
-                style={{
-                  background: "#e0eefc",
-                  minWidth: 130,
-                  minHeight: 180,
-                  border: selectedMovie === opt.movie ? "2px solid #4796e6" : "2px dashed #aaa",
-                  borderRadius: 7,
-                  alignItems: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-start",
-                  fontSize: 19,
-                  color: "#111",
-                  fontWeight: 500,
-                  margin: 6,
-                  cursor: "pointer",
-                  boxShadow: selectedMovie === opt.movie ? "0 2px 12px #b9e5ff" : "0 1px 6px #e2f2fd"
-                }}
-                onClick={() => setSelectedMovie(opt.movie)}
-              >
-                {opt.movieObj.poster_path ? (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w185${opt.movieObj.poster_path}`}
-                    alt={opt.movie}
-                    style={{
-                      width: "100%",
-                      maxWidth: 120,
-                      height: "auto",
-                      aspectRatio: "110/160",
-                      borderRadius: "6px",
-                      objectFit: "cover",
-                      marginTop: 10,
-                      marginBottom: 0,
-                      background: "#eaf1ff",
-                      border: selectedMovie === opt.movie
-                        ? "2px solid #4796e6"
-                        : "2px solid #e0eefc",
-                      boxShadow: selectedMovie === opt.movie
-                        ? "0 2px 12px #b9e5ff"
-                        : "0 1px 4px #e2f2fd"
-                    }}
-                    loading="lazy"
-                  />
-                ) : (
-                  <div style={{
-                    width: 110,
-                    height: 160,
-                    background: "#ccd7e9",
-                    borderRadius: 5,
+          {/* Show movie choices; correct answer always present */}
+          {questions[step].choices.map(opt => (
+            <div
+              key={opt.movie}
+              onDrop={e => { handleDrop(opt.movie, e); setDraggedChar(null); }}
+              onDragOver={e => e.preventDefault()}
+              tabIndex={0}
+              style={{
+                background: "#e0eefc",
+                minWidth: 130,
+                minHeight: 180,
+                border: selectedMovie === opt.movie ? "2px solid #4796e6" : "2px dashed #aaa",
+                borderRadius: 7,
+                alignItems: "center",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "flex-start",
+                fontSize: 19,
+                color: "#111",
+                fontWeight: 500,
+                margin: 6,
+                cursor: "pointer",
+                boxShadow: selectedMovie === opt.movie ? "0 2px 12px #b9e5ff" : "0 1px 6px #e2f2fd"
+              }}
+              onClick={() => setSelectedMovie(opt.movie)}
+            >
+              {opt.movieObj.poster_path ? (
+                <img
+                  src={`https://image.tmdb.org/t/p/w185${opt.movieObj.poster_path}`}
+                  alt={opt.movie}
+                  style={{
+                    width: "100%",
+                    maxWidth: 120,
+                    height: "auto",
+                    aspectRatio: "110/160",
+                    borderRadius: "6px",
+                    objectFit: "cover",
                     marginTop: 10,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#789",
-                    fontSize: 14,
-                    fontWeight: 500
-                  }}>
-                    No Poster
-                  </div>
-                )}
+                    marginBottom: 0,
+                    background: "#eaf1ff",
+                    border: selectedMovie === opt.movie
+                      ? "2px solid #4796e6"
+                      : "2px solid #e0eefc",
+                    boxShadow: selectedMovie === opt.movie
+                      ? "0 2px 12px #b9e5ff"
+                      : "0 1px 4px #e2f2fd"
+                  }}
+                  loading="lazy"
+                />
+              ) : (
                 <div style={{
+                  width: 110,
+                  height: 160,
+                  background: "#ccd7e9",
+                  borderRadius: 5,
                   marginTop: 10,
-                  textAlign: "center",
-                  fontWeight: 600,
-                  fontSize: 17,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  width: 110
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#789",
+                  fontSize: 14,
+                  fontWeight: 500
                 }}>
-                  {opt.movie}
+                  No Poster
                 </div>
+              )}
+              <div style={{
+                marginTop: 10,
+                textAlign: "center",
+                fontWeight: 600,
+                fontSize: 17,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                width: 110
+              }}>
+                {opt.movie}
               </div>
-            ));
-          })()}
+            </div>
+          ))}
         </div>
         <form onSubmit={handleSubmit}>
           <button type="submit" className="btn btn-large" style={{ marginTop: 16, width: 160, color: "#111", background: "#a9e9c9" }} disabled={!selectedMovie || reveal || justRevealed}>
@@ -306,7 +341,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         </button>
         {reveal && (
           <div style={{ marginTop: 20, color: "#b11324", fontWeight: 600 }}>
-            The correct answer: {questions[step].movie}
+            The correct answer: {questions[step].correctMovie}
           </div>
         )}
       </div>
