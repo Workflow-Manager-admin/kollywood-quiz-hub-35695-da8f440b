@@ -30,7 +30,7 @@ function QuizResult({ score, total, answers, onHome, game }) {
                 {a.character && <span><b>Character:</b> {a.character}<br /></span>}
                 <span>
                   <b>Your Answer:</b> <span style={{ color: a.wasCorrect ? "#27b14b" : "#b11124" }}>
-                    {a.guess || a.guessedMovie || (a.title || "—")}
+                    {typeof a.revealed !== "undefined" && a.revealed ? <em>Revealed (no score)</em> : (a.guess || a.guessedMovie || (a.title || "—"))}
                   </span>
                   <br />
                   <b>Correct:</b> {a.correct || a.actualMovie || a.title || "—"}

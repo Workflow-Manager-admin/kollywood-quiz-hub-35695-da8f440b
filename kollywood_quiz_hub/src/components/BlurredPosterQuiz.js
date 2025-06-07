@@ -64,8 +64,28 @@ function BlurredPosterQuiz({ onBackToDashboard }) {
     else setStep(step + 1);
   }
 
+  // PUBLIC_INTERFACE
   function handleReveal() {
     setReveal(true);
+    // Add a revealed answer (user did not score)
+    setUserAnswers([
+      ...userAnswers,
+      {
+        guess: "",
+        correct: movies[step].title,
+        wasCorrect: false,
+        revealed: true
+      }
+    ]);
+    // After short delay, advance to next question or finish
+    setTimeout(() => {
+      setReveal(false);
+      setShowClue(false);
+      setShowSecondClue(false);
+      setInputValue("");
+      if (step + 1 === QUESTIONS) setQuizOver(true);
+      else setStep(step + 1);
+    }, 1800); // 1.8s for user to see the answer
   }
 
   if (loading)

@@ -76,6 +76,26 @@ function MysteryMovieDetective({ onBackToDashboard }) {
     else setStep(step + 1);
   }
 
+  // PUBLIC_INTERFACE
+  function handleReveal() {
+    setReveal(true);
+    setUserAnswers([
+      ...userAnswers,
+      {
+        guess: "",
+        correct: movies[step]?.title,
+        wasCorrect: false,
+        revealed: true
+      }
+    ]);
+    setTimeout(() => {
+      setReveal(false);
+      setInput("");
+      if (step + 1 === QUESTIONS) setQuizOver(true);
+      else setStep(step + 1);
+    }, 1800);
+  }
+
   if (loading) return <div className="container" style={{ paddingTop: 110 }}>Loading...</div>;
   if (quizOver)
     return (
@@ -116,6 +136,7 @@ function MysteryMovieDetective({ onBackToDashboard }) {
           placeholder="Your Guess"
           value={input}
           onChange={e => setInput(e.target.value)}
+          disabled={reveal}
           style={{
             padding: "12px",
             minWidth: 200,
@@ -124,14 +145,14 @@ function MysteryMovieDetective({ onBackToDashboard }) {
             marginRight: 8
           }}
         />
-        <button className="btn btn-large" type="submit" style={{ color: "#111", background: "#9aefe2" }}>
+        <button className="btn btn-large" type="submit" style={{ color: "#111", background: "#9aefe2" }} disabled={reveal}>
           Submit
         </button>
       </form>
       <button
         className="btn"
         style={{ background: "#ffeed0", color: "#ca9421" }}
-        onClick={() => setReveal(true)}
+        onClick={handleReveal}
         disabled={reveal}
       >
         Reveal Answer

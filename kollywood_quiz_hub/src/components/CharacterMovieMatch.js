@@ -16,6 +16,10 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   const [draggedChar, setDraggedChar] = useState(null);
   const [loading, setLoading] = useState(false);
   const [quizOver, setQuizOver] = useState(false);
+
+  // Fix: make sure hooks are always called unconditionally, at the top:
+  const [reveal, setReveal] = useState(false);
+  const [justRevealed, setJustRevealed] = useState(false);
   // Sample characters. In real app, would fetch credits+characters from TMDB, here is stub:
   const CHARACTERS = [
     { name: "Vikram", movies: ["Anniyan", "I"] },
@@ -87,6 +91,32 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     );
   if (!questions[step]) return null;
 
+  // (Hooks for reveal state are already correctly declared at the top)
+
+  function handleReveal() {
+    setReveal(true);
+    setUserAnswers([
+      ...userAnswers,
+      {
+        guessedMovie: "",
+        actualMovie: questions[step].movie,
+        wasCorrect: false,
+        character: questions[step].character,
+        revealed: true
+      }
+    ]);
+    setJustRevealed(true);
+    setTimeout(() => {
+      setReveal(false);
+      setSelectedMovie("");
+      setJustRevealed(false);
+      if (step + 1 === QUESTIONS) setQuizOver(true);
+      else setStep(step + 1);
+    }, 1800);
+  }
+
+    // (removed duplicate hook declarations; hooks are already at the top unconditionally)
+
   // Drag-and-drop placeholders
   return (
     <div className="container" style={{ paddingTop: 100 }}>
@@ -157,10 +187,23 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           ))}
         </div>
         <form onSubmit={handleSubmit}>
-          <button type="submit" className="btn btn-large" style={{ marginTop: 16, width: 160, color: "#111", background: "#a9e9c9" }} disabled={!selectedMovie}>
+          <button type="submit" className="btn btn-large" style={{ marginTop: 16, width: 160, color: "#111", background: "#a9e9c9" }} disabled={!selectedMovie || reveal || justRevealed}>
             Submit
           </button>
         </form>
+        <button
+          className="btn"
+          style={{ marginTop: 12, background: "#efb307", color: "#211" }}
+          onClick={handleReveal}
+          disabled={reveal || justRevealed}
+        >
+          Reveal Answer
+        </button>
+        {reveal && (
+          <div style={{ marginTop: 20, color: "#b11324", fontWeight: 600 }}>
+            The correct answer: {questions[step].movie}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -51,6 +51,26 @@ function EmojiMovieQuiz({ onBackToDashboard }) {
     else setStep(step + 1);
   }
 
+  // PUBLIC_INTERFACE
+  function handleReveal() {
+    setReveal(true);
+    setUserAnswers([
+      ...userAnswers,
+      {
+        guess: "",
+        correct: movies[step].title,
+        wasCorrect: false,
+        revealed: true
+      }
+    ]);
+    setTimeout(() => {
+      setReveal(false);
+      setInput("");
+      if (step + 1 === QUESTIONS) setQuizOver(true);
+      else setStep(step + 1);
+    }, 1800);
+  }
+
   if (quizOver)
     return (
       <QuizResult
@@ -82,6 +102,7 @@ function EmojiMovieQuiz({ onBackToDashboard }) {
           placeholder="Your Guess"
           value={input}
           onChange={e => setInput(e.target.value)}
+          disabled={reveal}
           style={{
             padding: "12px",
             minWidth: 220,
@@ -90,14 +111,14 @@ function EmojiMovieQuiz({ onBackToDashboard }) {
             marginRight: 8
           }}
         />
-        <button type="submit" className="btn btn-large" style={{ color: "#111", background: "#ccffd2" }}>
+        <button type="submit" className="btn btn-large" style={{ color: "#111", background: "#ccffd2" }} disabled={reveal}>
           Submit
         </button>
       </form>
       <button
         className="btn"
         style={{ background: "#faf3c7", color: "#ba8c00" }}
-        onClick={() => setReveal(true)}
+        onClick={handleReveal}
         disabled={reveal}
       >
         Reveal Answer
