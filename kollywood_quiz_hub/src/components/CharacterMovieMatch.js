@@ -47,14 +47,14 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     setLoading(true);
     fetchKollywoodMovies()
       .then((allMovies) => {
-        // Build all possible character-movie pairs where the movie exists in the TMDB response
-        const validPairs = [];
-        // For fast lookup
+        // 1. Build array of only real (character, movie) pairs where the movie exists in TMDB
         const movieTitleToObj = {};
         allMovies.forEach((movie) => {
           movieTitleToObj[movie.title] = movie;
         });
 
+        // Only push genuine pairings from CHARACTERS; don't supplement with fake pairs.
+        const validPairs = [];
         CHARACTERS.forEach((char) => {
           char.movies.forEach((mov) => {
             if (movieTitleToObj[mov]) {
@@ -67,120 +67,57 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           });
         });
 
-        // Shuffle pairs, select up to QUESTIONS
-        const shuffledPairs = validPairs.sort(() => 0.5 - Math.random()).slice(0, QUESTIONS);
+        // If not enough valid pairs, use as many as we have.
+        const selectedPairs = validPairs
+          .sort(() => 0.5 - Math.random())
+          .slice(0, QUESTIONS);
 
-        // If too few pairs, fill with random extra pairs
-        let resultQuestions = [...shuffledPairs];
-        if (resultQuestions.length < QUESTIONS) {
-          // Pick from allMovies that aren't already included
-          const usedMovieNames = new Set(resultQuestions.map(q => q.movie));
-          let charIdx = 0;
-          for (let i = 0; i < allMovies.length && resultQuestions.length < QUESTIONS; ++i) {
-            const movie = allMovies[i];
-            if (!usedMovieNames.has(movie.title)) {
-              // Rotate through CHARACTERS to assign, or fallback to dummy
-              const ch = CHARACTERS[charIdx % CHARACTERS.length];
-              resultQuestions.push({
-                character: ch.name,
-                movie: movie.title,
-                movieObj: movie,
-              });
-              usedMovieNames.add(movie.title);
-              charIdx++;
-            }
-          }
-        }
+        // Prepare a set of all movies that can be used as distractors (with poster & title, not the correct answer)
+        const distractorPool = allMovies.filter(
+          m => !!m.title && !!m.poster_path
+        );
 
-        // For each question, build the option set: correct movie + random distractors (never omitting the correct one!)
-        const buildChoicesForQuestions = () => {
-          /**
-           * Always include the correct movie (poster & title) among options.
-           * Fill others with randomly chosen plausible distractors with poster/title that are not the correct movie.
-           */
-          const allWithPosterTitle = allMovies.filter(
-            m => !!m.title && !!m.poster_path
+        // Create questions array: Each clue is character (from selectedPair), correct answer is associated movie,
+        // options contain the correct answer and two distractors not tied to the clue's character.
+        const questionsBuilt = selectedPairs.map(pair => {
+          // Find distractors that are not correct (by title), and are not tied to this character in CHARACTERS
+          const charMovieTitles = CHARACTERS
+            .find(c => c.name === pair.character)?.movies || [];
+          const correctMovieTitle = pair.movie;
+
+          // Find distractors that are not associated with this character at all and not the answer
+          let possibleDistractors = distractorPool.filter(m =>
+            m.title !== correctMovieTitle && !charMovieTitles.includes(m.title)
           );
 
-          // Make sure the correct movieObj has poster and title – fallback to allMovies if missing
-          function getCorrectOption(movieTitle, mainObj) {
-            if (mainObj && mainObj.poster_path && mainObj.title) {
-              return { movie: mainObj.title, movieObj: mainObj };
-            }
-            // Fallback to any in allWithPosterTitle or allMovies by title
-            const altObj = allWithPosterTitle.find(m => m.title === movieTitle)
-              || allMovies.find(m => m.title === movieTitle);
-            if (altObj) return { movie: altObj.title, movieObj: altObj };
-            // In rare failure, make a dummy
-            return { movie: movieTitle, movieObj: { title: movieTitle, poster_path: "", id: "dummy" } };
-          }
+          // Shuffle to pick random distractors
+          possibleDistractors = possibleDistractors.sort(() => 0.5 - Math.random());
 
-          function getRandomDistractors(correctMovieTitle, num, usedTitles = new Set()) {
-            // UsedTitles may include the correct movie, and any already in the choices.
-            const pool = allWithPosterTitle.filter(
-              m => m.title !== correctMovieTitle && !usedTitles.has(m.title)
-            );
-            // Shuffle (copy to avoid mutate)
-            const shuffled = pool.slice().sort(() => Math.random() - 0.5);
-            const distractors = [];
-            for (let i = 0; i < shuffled.length && distractors.length < num; ++i) {
-              distractors.push({ movie: shuffled[i].title, movieObj: shuffled[i] });
-              usedTitles.add(shuffled[i].title);
-            }
-            // Defensive: fill in with randoms from allMovies if needed (should not occur unless <num pool)
-            let altI = 0;
-            while (distractors.length < num && altI < allMovies.length) {
-              const alt = allMovies[altI++];
-              if (
-                alt.title !== correctMovieTitle
-                && !usedTitles.has(alt.title)
-                && alt.title
-              ) {
-                distractors.push({ movie: alt.title, movieObj: alt });
-                usedTitles.add(alt.title);
-              }
-            }
-            return distractors;
-          }
+          // Pick two distractors
+          const distractorOptions = possibleDistractors.slice(0, CHOICES_PER_QUESTION - 1).map(m => ({
+            movie: m.title,
+            movieObj: m
+          }));
 
-          // Build each Q: Always correct + (random) distractors, shuffled
-          return resultQuestions.map((qInfo) => {
-            // Always use the primary listed movie (first in character's movies array)
-            const correctMovieTitle = qInfo.movie;
-            const correctOption = getCorrectOption(correctMovieTitle, qInfo.movieObj);
-            // Defensive guarantee: destructure and check
-            if (!correctOption.movie || !correctOption.movieObj) {
-              // There is a logic bug if this occurs, but fallback to skip/bad entry
-              return null;
-            }
-            // Option unique set, starting with correct
-            const optionsList = [correctOption];
-            // Use set for uniqueness
-            const usedTitles = new Set([correctOption.movie]);
-            // Add enough distractors
-            const need = CHOICES_PER_QUESTION - 1;
-            const distractors = getRandomDistractors(correctMovieTitle, need, usedTitles);
-            optionsList.push(...distractors);
+          // Always include correct answer option as object
+          const correctOption = {
+            movie: pair.movieObj.title,
+            movieObj: pair.movieObj
+          };
 
-            // Only keep CHOICES_PER_QUESTION; shuffle
-            const finalOpts = optionsList.slice(0, CHOICES_PER_QUESTION)
-              .sort(() => Math.random() - 0.5);
-            // FINAL DEFENSE: ensure correct answer always present
-            if (!finalOpts.find(o => o.movie === correctMovieTitle)) {
-              // Replace a random one
-              finalOpts[Math.floor(Math.random() * finalOpts.length)] = correctOption;
-            }
+          // Combine and shuffle options
+          const options = [correctOption, ...distractorOptions].sort(() => 0.5 - Math.random());
 
-            return {
-              character: qInfo.character,
-              correctMovie: correctMovieTitle,
-              correctMovieObj: correctOption.movieObj,
-              choices: finalOpts,
-            };
-          }).filter(Boolean);
-        };
+          // Guarantee there are only CHOICES_PER_QUESTION options
+          return {
+            character: pair.character,
+            correctMovie: correctMovieTitle,
+            correctMovieObj: pair.movieObj,
+            choices: options.slice(0, CHOICES_PER_QUESTION)
+          };
+        });
 
-        setQuestions(buildChoicesForQuestions());
+        setQuestions(questionsBuilt);
         setLoading(false);
       })
       .catch(() => setLoading(false));
