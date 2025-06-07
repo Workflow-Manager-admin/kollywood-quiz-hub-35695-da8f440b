@@ -139,7 +139,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 
   // MAIN QUIZ ROUND BUILDER
   useEffect(() => {
-    // Build quiz rounds dynamically using TMDB
+    // Build quiz rounds dynamically using TMDB, or fallback if not enough
     let cancelled = false;
     async function prepareRounds() {
       setLoading(true);
@@ -154,14 +154,15 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           pair.movie,
           CHOICES_PER_QUESTION - 1
         );
-        // If not enough distractors or missing poster, mark bad
+        // Compose choices (at least 1 correct, 3 distractors)
         const choicesArr = [
           ...(correctMovieObj
             ? [
                 {
                   ...correctMovieObj,
-                  title: correctMovieObj.title || pair.movie, // title fallback
-                  poster_path: correctMovieObj.poster_path || null
+                  title: correctMovieObj.title || pair.movie,
+                  poster_path: correctMovieObj.poster_path || null,
+                  id: correctMovieObj.id || `tmdb-missing-${idx}`,
                 }
               ]
             : [
@@ -176,11 +177,12 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             distractorsArr.map(d => ({
               ...d,
               title: d.title,
-              poster_path: d.poster_path || null
+              poster_path: d.poster_path || null,
+              id: d.id || null,
             }))
           )
           .sort(() => 0.5 - Math.random());
-        // If any missing posters or not enough distractors, bail to fallback
+        // If any missing posters or not enough distractors, or not enough questions, bail to fallback
         const fallbackNeeded =
           !correctPoster ||
           choicesArr.length < CHOICES_PER_QUESTION ||
@@ -197,6 +199,13 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           correctMovieObj: correctMovieObj,
           choices: choicesArr
         });
+      }
+      // Defensive: If API fails to yield enough valid rounds, fallback to demo
+      if (rounds.length < 1 || rounds[0]?.choices?.length < 1) {
+        setQuestions(FALLBACK_QUESTIONS);
+        setUsingFallback(true);
+        setLoading(false);
+        return;
       }
       // Use only QUESTIONS count
       const selectedRounds = rounds.slice(0, QUESTIONS);
@@ -256,31 +265,48 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 
   // PUBLIC_INTERFACE
   /**
-   * Records the user's answer for the current round, using IDs and titles for full reliability.
+   * Records the user's answer for the current round by using movie IDs (preferred) and titles,
+   * ensuring both user's answer and correct answer are always stored with persistent identifiers.
+   * All result comparison is done by ID if available, else by normalized title.
    */
   function recordAnswer(selectedMovieObj) {
-    // Prefer TMDB movie ID if available for comparison, fallback to title if needed
-    const correctMovieObj = questions[step].choices.find(
-      c => c.title === questions[step].correctMovie
-    ) || questions[step].correctMovieObj;
+    // Find the correct movie object in choices/fallback, prioritizing TMDB ID
+    const correctChoice =
+      questions[step].choices.find(
+        c =>
+          (c.id && c.id === (questions[step].correctMovieObj && questions[step].correctMovieObj.id)) ||
+          (c.title &&
+            questions[step].correctMovieObj &&
+            c.title.toLowerCase() === questions[step].correctMovieObj.title.toLowerCase())
+      ) ||
+      questions[step].correctMovieObj ||
+      questions[step].choices.find(c => c.title === questions[step].correctMovie) ||
+      null;
 
-    // Use ID if present, else title match (ensures correctness even if poster/choice order changes)
-    const isCorrect = (
-      (selectedMovieObj.id && correctMovieObj && selectedMovieObj.id === correctMovieObj.id) ||
-      (!selectedMovieObj.id && selectedMovieObj.title === questions[step].correctMovie)
-    );
+    // Defensive title normalization for matching if ID unavailable
+    const isCorrect =
+      (selectedMovieObj.id &&
+        correctChoice &&
+        String(selectedMovieObj.id) === String(correctChoice.id)) ||
+      (
+        !selectedMovieObj.id &&
+        correctChoice &&
+        selectedMovieObj.title &&
+        correctChoice.title &&
+        selectedMovieObj.title.toLowerCase().trim() === correctChoice.title.toLowerCase().trim()
+      );
 
     setUserAnswers(prev => [
       ...prev,
       {
         character: questions[step].clue,
+        answerId: selectedMovieObj.id || null,
         answerTitle: selectedMovieObj.title,
         answerPoster: selectedMovieObj.poster_path || null,
-        answerId: selectedMovieObj.id || null,
-        wasCorrect: isCorrect,
-        correctTitle: correctMovieObj?.title || questions[step].correctMovie,
-        correctPoster: correctMovieObj?.poster_path || null,
-        correctId: correctMovieObj?.id || null
+        wasCorrect: !!isCorrect,
+        correctId: correctChoice?.id || null,
+        correctTitle: correctChoice?.title || questions[step].correctMovie,
+        correctPoster: correctChoice?.poster_path || null,
       }
     ]);
     setAnsweredIdx(null);

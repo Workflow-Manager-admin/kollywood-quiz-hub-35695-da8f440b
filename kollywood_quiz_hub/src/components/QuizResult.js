@@ -17,12 +17,26 @@ function QuizResult({ score, total, answers, onHome, game }) {
                 : `https://image.tmdb.org/t/p/w92${poster}`
             }
             alt={title || fallback}
-            style={{ width: 36, height: 52, objectFit: "cover", borderRadius: 4, marginRight: 5, border: "1.5px solid #b8ede8" }}
+            style={{
+              width: 36,
+              height: 52,
+              objectFit: "cover",
+              borderRadius: 4,
+              marginRight: 5,
+              border: "1.5px solid #b8ede8"
+            }}
           />
         ) : null}
         <span>{title || fallback}</span>
       </span>
     );
+  }
+
+  // Helper for normalized string or fallback display value
+  function safe(val, fallback = "—") {
+    return typeof val === "string" && val.trim().length > 0
+      ? val
+      : fallback;
   }
 
   return (
@@ -47,15 +61,15 @@ function QuizResult({ score, total, answers, onHome, game }) {
           {answers &&
             answers.map((a, i) => (
               <li key={i} style={{ marginBottom: 12, borderBottom: "1px solid #e3f0fb", paddingBottom: 8 }}>
-                {a.character && <span><b>Character:</b> {a.character}<br /></span>}
+                {a.character && <span><b>Character:</b> {safe(a.character)}<br /></span>}
                 <span>
                   <b>Your Answer:</b>{" "}
                   <span style={{ color: a.wasCorrect ? "#27b14b" : "#b11124" }}>
                     {typeof a.revealed !== "undefined" && a.revealed
                       ? <em>Revealed (no score)</em>
                       : (a.answerTitle
-                          ? renderMovieAnswer(a.answerTitle, a.answerPoster)
-                          : a.guess || a.guessedMovie || (a.title || "—"))
+                        ? renderMovieAnswer(a.answerTitle, a.answerPoster)
+                        : a.guess || a.guessedMovie || a.title || "—")
                     }
                   </span>
                   <br />
@@ -63,6 +77,12 @@ function QuizResult({ score, total, answers, onHome, game }) {
                   {a.correctTitle
                     ? renderMovieAnswer(a.correctTitle, a.correctPoster)
                     : (a.correct || a.actualMovie || a.title || "—")}
+                  {a.wasCorrect === false && a.answerId && a.correctId && a.answerId !== a.correctId && (
+                    <span style={{ color: "#de0249", fontSize: 13, marginLeft: 7 }}>
+                      {/* Marker for clarification if IDs mismatched */}
+                      [id: {String(a.answerId)} ≠ {String(a.correctId)}]
+                    </span>
+                  )}
                 </span>
               </li>
             ))}
