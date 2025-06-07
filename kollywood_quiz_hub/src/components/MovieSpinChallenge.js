@@ -441,6 +441,21 @@ function MovieSpinChallenge({ onBackToDashboard }) {
     window.location.reload();
   }
 
+  // --- Reveal Answer feature state ---
+  const [revealMovie, setRevealMovie] = useState(null);
+  const [showRevealHighlight, setShowRevealHighlight] = useState(false);
+
+  // Handler: Reveal the correct movie for current combo (find and highlight in UI)
+  function handleRevealAnswer() {
+    if (!finalCombo) return;
+    const match = checkComboMatch(finalCombo, movies);
+    setRevealMovie(match || null);
+    setShowRevealHighlight(true);
+    setShowResult(false);
+    setFeedback("");
+    setMatchingMovie(match || null);
+  }
+
   // --- Render UI ---
   if (loading) {
     return (
@@ -480,6 +495,92 @@ function MovieSpinChallenge({ onBackToDashboard }) {
         onHome={onBackToDashboard}
         game="Movie Spin Challenge"
       />
+    );
+  }
+
+  // Highlighted reveal panel for visual clarity
+  function renderRevealPanel() {
+    if (!finalCombo || !showRevealHighlight) return null;
+    // If revealMovie is null, no such combo match exists
+    return (
+      <div style={{
+        margin: "34px auto 16px",
+        padding: "19px 12px 12px 12px",
+        borderRadius: 15,
+        background: "#ffd127",
+        border: "3.5px solid #fe2e2e",
+        boxShadow: "0 6px 22px #fab40075",
+        maxWidth: 370,
+        color: "#2c1805",
+        fontWeight: 900,
+        textAlign: "center",
+        fontSize: 21,
+        position: "relative",
+        zIndex: 10,
+      }}>
+        <span role="img" aria-label="Reveal">🎬</span>{" "}
+        <span style={{ color: "#b90613", fontSize: 19, fontWeight: 900 }}>Correct Movie:</span>
+        <br />
+        {revealMovie ? (
+          <>
+            <span style={{ fontSize: 23, color: "#201582", fontWeight: 900, textShadow: "0 2px 8px #ffe5a2" }}>
+              {revealMovie.title}
+            </span>
+            {revealMovie.fullDetails && revealMovie.fullDetails.poster_path && (
+              <div style={{ marginTop: 8, marginBottom: 3 }}>
+                <img
+                  src={`https://image.tmdb.org/t/p/w185${revealMovie.fullDetails.poster_path}`}
+                  alt={`Poster for ${revealMovie.title}`}
+                  style={{
+                    width: 82,
+                    height: 118,
+                    borderRadius: 6,
+                    border: "3px solid #ad46e8",
+                    boxShadow: "0 5px 21px #cdba4f, 0 1.5px 8px #fff7"
+                  }}
+                />
+              </div>
+            )}
+            <div style={{
+              margin: "10px 0 0 0", color: "#222", fontWeight: 600, fontSize: 15.5,
+              background: "#ffffffcc", borderRadius: 6, padding: "8px 5px 6px 5px",
+              border: "1px solid #ffe43a"
+            }}>
+              <b>Matched:</b>
+              {" "}
+              <span style={{ color: "#24bec9" }}>{finalCombo.actor}</span>
+              {" ● "}
+              <span style={{ color: "#ffd700" }}>{finalCombo.genre}</span>
+              {" ● "}
+              <span style={{ color: "#5f24ad" }}>{finalCombo.location}</span>
+            </div>
+          </>
+        ) : (
+          <span style={{ fontSize: 18, color: "#b6001f" }}>
+            No Kollywood movie from the grid matches <b>all three</b> of:<br />
+            <span style={{ color: "#24bec9" }}>{finalCombo.actor}</span> |{" "}
+            <span style={{ color: "#ffd700" }}>{finalCombo.genre}</span> |{" "}
+            <span style={{ color: "#5f24ad" }}>{finalCombo.location}</span>
+          </span>
+        )}
+        <div>
+          <button
+            className="btn"
+            style={{
+              marginTop: 13,
+              background: "#171e3b", color: "#ffd500",
+              border: "2px solid #ffd139", fontWeight: 700,
+              padding: "9px 18px", fontSize: "1.08rem"
+            }}
+            onClick={() => {
+              setShowRevealHighlight(false);
+              setRevealMovie(null);
+            }}
+          >
+            Hide Answer
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -613,6 +714,28 @@ function MovieSpinChallenge({ onBackToDashboard }) {
           </span>
         </div>
       )}
+      {finalCombo && (
+        <div style={{ textAlign: "center", marginBottom: 16, marginTop: -9 }}>
+          <button
+            className="btn btn-large"
+            style={{
+              background: "#ffe13e",
+              color: "#752019",
+              border: "2.2px solid #daba00",
+              fontWeight: 800,
+              boxShadow: "0 1px 12px #ffe00044",
+              padding: "10px 24px",
+              fontSize: "1.09rem"
+            }}
+            disabled={spinning || showRevealHighlight}
+            onClick={handleRevealAnswer}
+          >
+            Reveal Answer
+          </button>
+        </div>
+      )}
+      {/* Revealed answer panel */}
+      {renderRevealPanel()}
       {/* User input and matching logic */}
       {finalCombo && (
         <form onSubmit={handleUserSubmit} style={{ textAlign: "center", marginBottom: 9 }}>
