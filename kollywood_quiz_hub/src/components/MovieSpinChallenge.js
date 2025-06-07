@@ -338,6 +338,43 @@ function MovieSpinChallenge({ onBackToDashboard }) {
     );
   }
 
+  // --- ANSWER INPUT STATE & HANDLERS ---
+  const [userAnswer, setUserAnswer] = useState("");
+  const [feedback, setFeedback] = useState(null); // {correct:bool, text:string}
+  const [locked, setLocked] = useState(false);
+
+  // When triple changes, reset answer box/feedback
+  useEffect(() => {
+    setUserAnswer("");
+    setFeedback(null);
+    setLocked(false);
+  }, [finalTriple]);
+
+  // PUBLIC_INTERFACE
+  function handleAnswerInput(e) {
+    setUserAnswer(e.target.value);
+  }
+
+  // PUBLIC_INTERFACE
+  function handleAnswerSubmit(e) {
+    e.preventDefault();
+    if (!finalTriple || !finalTriple.movie) return;
+    if (locked) return;
+    const input = userAnswer.trim().toLowerCase();
+    const correctTitle = (finalTriple.movie.title || "").trim().toLowerCase();
+    if (!input) {
+      setFeedback({ correct: false, text: "Please enter a movie name." });
+      return;
+    }
+    if (input === correctTitle) {
+      setFeedback({ correct: true, text: "✅ Correct! Well done." });
+      setLocked(true);
+    } else {
+      setFeedback({ correct: false, text: `❌ Incorrect. Try revealing the answer for the real movie!` });
+      setLocked(true);
+    }
+  }
+
   if (loading) {
     return (
       <div className="container" style={{ paddingTop: 120 }}>
@@ -446,24 +483,107 @@ function MovieSpinChallenge({ onBackToDashboard }) {
       </div>
       {/* The explicit spun combination display box (e.g., 'Your Movie Spin: ...') was removed as per requirements. */}
       {finalTriple && (
-        <div style={{ textAlign: "center", marginBottom: 16, marginTop: -9 }}>
-          <button
-            className="btn btn-large"
+        <>
+          <div
             style={{
-              background: "#ffe13e",
-              color: "#752019",
-              border: "2.2px solid #daba00",
-              fontWeight: 800,
-              boxShadow: "0 1px 12px #ffe00044",
-              padding: "10px 24px",
-              fontSize: "1.09rem"
+              display: "flex", flexDirection: "column", alignItems: "center",
+              justifyContent: "center", marginTop: 10, marginBottom: 6
             }}
-            disabled={spinning || showRevealPanel}
-            onClick={handleRevealAnswer}
           >
-            Reveal Movie
-          </button>
-        </div>
+            <form
+              onSubmit={handleAnswerSubmit}
+              style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 0 }}
+              autoComplete="off"
+            >
+              <input
+                type="text"
+                value={userAnswer}
+                disabled={locked || showRevealPanel || spinning}
+                onChange={handleAnswerInput}
+                placeholder="Guess the movie title..."
+                aria-label="Movie answer"
+                style={{
+                  padding: "11px 10px",
+                  minWidth: 170,
+                  maxWidth: 340,
+                  fontSize: "1rem",
+                  borderRadius: 4,
+                  border: "2px solid #ffe43c",
+                  marginRight: 8,
+                  background: locked ? "#e9e9e9" : "#fff",
+                  color: "#162249",
+                  fontWeight: 500,
+                  outline: "none",
+                  boxShadow: "0 1px 5px #fea 0.5",
+                  opacity: locked || showRevealPanel ? 0.68 : 1
+                }}
+              />
+              <button
+                className="btn btn-large"
+                type="submit"
+                style={{
+                  background: locked
+                    ? (feedback?.correct
+                      ? "#25d871"
+                      : "#ea2340")
+                    : "#3be8c1",
+                  color: locked
+                    ? "#fff"
+                    : "#222",
+                  fontWeight: 700,
+                  fontSize: 19,
+                  border: "2.4px solid #231b67",
+                  pointerEvents: locked || showRevealPanel || spinning ? "none" : "auto",
+                  opacity: locked ? 0.85 : 1,
+                  textShadow: "0 0.5px 8px #eee",
+                  minWidth: 100
+                }}
+                disabled={locked || showRevealPanel || spinning}
+              >
+                Submit
+              </button>
+            </form>
+            <div
+              style={{
+                marginTop: 16,
+                marginBottom: 10,
+                fontWeight: 700,
+                fontSize: 17,
+                color: feedback
+                  ? (feedback.correct ? "#0cd545" : "#ff3465")
+                  : "inherit",
+                textShadow: feedback
+                  ? (feedback.correct
+                    ? "0 1.5px 8px #316c00"
+                    : "0 2px 10px #82001e")
+                  : "",
+                minHeight: 28,
+                minWidth: 140
+              }}
+              aria-live="polite"
+            >
+              {feedback && feedback.text}
+            </div>
+          </div>
+          <div style={{ textAlign: "center", marginBottom: 16, marginTop: -9 }}>
+            <button
+              className="btn btn-large"
+              style={{
+                background: "#ffe13e",
+                color: "#752019",
+                border: "2.2px solid #daba00",
+                fontWeight: 800,
+                boxShadow: "0 1px 12px #ffe00044",
+                padding: "10px 24px",
+                fontSize: "1.09rem"
+              }}
+              disabled={spinning || showRevealPanel}
+              onClick={handleRevealAnswer}
+            >
+              Reveal Movie
+            </button>
+          </div>
+        </>
       )}
       {/* Revealed movie panel */}
       {renderRevealPanel()}
