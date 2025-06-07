@@ -5,36 +5,47 @@ import QuizResult from "./QuizResult";
 /**
  * PUBLIC_INTERFACE
  * MoviePropsInventory — Kollywood-only, 4-emoji/animated icon clues per movie, no poster or title displayed.
+ * 
+ * - Only uses a hand-curated set of movies and their emoji clues (strictly Kollywood).
+ * - Each clue set uses 4 strong visually distinct emoji props.
+ * - Strong font color/font-weight styling for clues and input.
  */
 function MoviePropsInventory({ onBackToDashboard }) {
-  // All movies and clues must be Kollywood (Tamil) only. Each object has 4 clues and a single answer.
-  // Example clue set: cycle emoji, Indian cobra emoji, pot emoji, potato emoji for answer 'Meiyazhagan'
-
-  // Source: Hardcoded Kollywood clue sets (all clues are string emojis/descriptive icon as required)
-  const FOUR_PROP_CLUES = [
+  // Curated Kollywood movies and their prop clues
+  // All clues are emojis with description, 4 per movie
+  const MOVIE_PROP_CLUES = [
     {
       answer: "Meiyazhagan",
       clues: [
         { emoji: "🚲", label: "Cycle" },
-        { emoji: "🐍", label: "Indian Cobra" },
+        { emoji: "🐍", label: "Snake" },
         { emoji: "🪣", label: "Pot" },
         { emoji: "🥔", label: "Potato" }
       ]
     },
     {
+      answer: "Super Deluxe",
+      clues: [
+        { emoji: "🏳️‍⚧️", label: "Transgender Flag" },
+        { emoji: "📺", label: "Old TV" },
+        { emoji: "🥓", label: "Bacon" },
+        { emoji: "⚡", label: "Thunder" }
+      ]
+    },
+    {
       answer: "Baasha",
       clues: [
-        { emoji: "🕶️", label: "Sunglasses" },
+        { emoji: "🕶️", label: "Black Sunglasses" },
         { emoji: "🛺", label: "Auto Rickshaw" },
         { emoji: "🚬", label: "Cigar" },
-        { emoji: "💪", label: "Power" }
+        { emoji: "💪", label: "Strongman" }
       ]
     },
     {
       answer: "Anbe Sivam",
       clues: [
         { emoji: "☂️", label: "Red Umbrella" },
-        { emoji: "🧔‍♂️", label: "Beard" },
+        { emoji: "🧔‍♂️", label: "Bearded Man" },
         { emoji: "🧳", label: "Travel Bag" },
         { emoji: "🦁", label: "Lion" }
       ]
@@ -69,27 +80,18 @@ function MoviePropsInventory({ onBackToDashboard }) {
     {
       answer: "Kaakha Kaakha",
       clues: [
-        { emoji: "👮‍♂️", label: "Police" },
-        { emoji: "🔫", label: "Gun" },
-        { emoji: "🏡", label: "House" },
-        { emoji: "🎸", label: "Guitar" }
-      ]
-    },
-    {
-      answer: "Super Deluxe",
-      clues: [
-        { emoji: "🏳️‍⚧️", label: "Transgender" },
-        { emoji: "💔", label: "Broken Heart" },
-        { emoji: "🔫", label: "Gun" },
-        { emoji: "📺", label: "TV" }
+        { emoji: "👮‍♂️", label: "Policeman" },
+        { emoji: "🚗", label: "Car" },
+        { emoji: "💔", label: "Heartbreak" },
+        { emoji: "🔫", label: "Gun" }
       ]
     },
     {
       answer: "Cuckoo",
       clues: [
         { emoji: "🎻", label: "Violin" },
-        { emoji: "🕶️", label: "Shades" },
-        { emoji: "🌅", label: "Morning" },
+        { emoji: "🕶️", label: "Dark Glasses" },
+        { emoji: "🌅", label: "Dawn" },
         { emoji: "🦯", label: "Blind Cane" }
       ]
     },
@@ -98,17 +100,26 @@ function MoviePropsInventory({ onBackToDashboard }) {
       clues: [
         { emoji: "💍", label: "Ring" },
         { emoji: "👰‍♀️", label: "Bride" },
-        { emoji: "💔", label: "Heartbreak" },
-        { emoji: "🏠", label: "Home" }
+        { emoji: "🏠", label: "Home" },
+        { emoji: "💔", label: "Heartbreak" }
+      ]
+    },
+    {
+      answer: "Vikram Vedha",
+      clues: [
+        { emoji: "🔫", label: "Pistol" },
+        { emoji: "😈", label: "Villain" },
+        { emoji: "👮‍♂️", label: "Cop" },
+        { emoji: "🕵️‍♂️", label: "Detective" }
       ]
     }
   ];
 
-  const QUESTIONS = 8; // Show 8 questions per session
+  const QUESTIONS = 8;
 
-  // Shuffle and pick unique rounds for every session
-  function pickRandomRounds() {
-    let arr = FOUR_PROP_CLUES.slice();
+  // Shuffle and select QUESTIONS unique rounds
+  function pickRounds() {
+    let arr = MOVIE_PROP_CLUES.slice();
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -116,59 +127,55 @@ function MoviePropsInventory({ onBackToDashboard }) {
     return arr.slice(0, QUESTIONS);
   }
 
-  const [quizRounds] = useState(() => pickRandomRounds());
+  const [quizRounds] = useState(() => pickRounds());
   const [step, setStep] = useState(0);
-  const [userAnswer, setUserAnswer] = useState("");
+  const [userInput, setUserInput] = useState("");
   const [userAnswers, setUserAnswers] = useState([]);
-  const [showAnswerFeedback, setShowAnswerFeedback] = useState(null); // {correct, correctTitle}
+  const [showFeedback, setShowFeedback] = useState(null); // {correct, correctTitle}
   const [reveal, setReveal] = useState(false);
   const [quizOver, setQuizOver] = useState(false);
 
-  // PUBLIC_INTERFACE - Submission
+  // PUBLIC_INTERFACE - Submission handler
   function handleSubmit(e) {
     e.preventDefault();
     if (!quizRounds[step] || quizOver) return;
-    const guess = (userAnswer || "").trim().toLowerCase();
+    const guess = (userInput || "").trim().toLowerCase();
     const correctTitle = quizRounds[step].answer;
-    const wasCorrect = guess === correctTitle.trim().toLowerCase();
-    setShowAnswerFeedback({ correct: wasCorrect, correctTitle });
-    setUserAnswers((prev) => [
+    const wasCorrect = guess === correctTitle.toLowerCase();
+    setShowFeedback({ correct: wasCorrect, correctTitle });
+    setUserAnswers(prev => [
       ...prev,
-      {
-        guess,
-        correct: correctTitle,
-        wasCorrect
-      }
+      { guess, correct: correctTitle, wasCorrect }
     ]);
     setReveal(false);
     setTimeout(() => {
-      setShowAnswerFeedback(null);
-      setUserAnswer("");
+      setShowFeedback(null);
+      setUserInput("");
       if (step + 1 === QUESTIONS) setQuizOver(true);
       else setStep(step + 1);
-    }, 1400);
+    }, 1250);
   }
 
-  // PUBLIC_INTERFACE - Reveal/giveup
+  // PUBLIC_INTERFACE - Reveal handler
   function handleReveal() {
     setReveal(true);
     const correctTitle = quizRounds[step].answer;
-    setShowAnswerFeedback({ correct: false, correctTitle });
-    setUserAnswers((prev) => [
+    setShowFeedback({ correct: false, correctTitle });
+    setUserAnswers(prev => [
       ...prev,
       { guess: "", correct: correctTitle, wasCorrect: false, revealed: true }
     ]);
     setTimeout(() => {
-      setShowAnswerFeedback(null);
-      setUserAnswer("");
+      setShowFeedback(null);
+      setUserInput("");
       setReveal(false);
       if (step + 1 === QUESTIONS) setQuizOver(true);
       else setStep(step + 1);
     }, 1800);
   }
 
-  // VISUAL: Four large clue icons per movie, no titles/posters/hints
-  function renderPropClueBox(clues) {
+  // Render the prop clue box for 4 strong-styled emoji clues
+  function renderPropClues(clues) {
     if (!clues || clues.length < 1) return null;
     return (
       <div
@@ -177,42 +184,41 @@ function MoviePropsInventory({ onBackToDashboard }) {
           flexWrap: "wrap",
           gap: "20px",
           justifyContent: "center",
-          marginTop: 14,
-          marginBottom: 20
+          marginTop: 16,
+          marginBottom: 24
         }}
-        aria-label="Movie prop clues"
+        aria-label="Movie Prop Clues"
       >
         {clues.map((c, i) => (
           <div
-            key={c.emoji + "-" + i}
+            key={c.emoji + i}
             style={{
-              background: "linear-gradient(135deg, #ffe54c 70%, #25b6e6 125%)",
-              border: "3.2px solid #0ad09c",
-              borderRadius: 16,
-              minWidth: 84,
-              minHeight: 84,
-              fontSize: 44,
-              color: "#1f1f1f",
+              background: "linear-gradient(120deg, #ffe54c 70%, #25b6e6 130%)",
+              border: "3px solid #12cbac",
+              borderRadius: 14,
+              minWidth: 82,
+              minHeight: 82,
+              fontSize: 43,
+              color: "#231d3b",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
               fontWeight: 900,
-              boxShadow: "0 3px 16px #bafff4, 0 7px 40px #ffe44e55",
-              padding: "10px 12px 3px 12px",
-              position: "relative",
-              transition: "transform .14s",
-              outline: "none"
+              boxShadow: "0 2px 16px #bafff484, 0 1px 34px #ffe44e45",
+              padding: "13px 14px 7px 14px",
+              outline: "none",
+              position: "relative"
             }}
-            aria-label={"Clue: " + c.label}
             tabIndex={0}
+            aria-label={"Clue: " + c.label}
           >
             <span
               style={{
-                fontSize: 50,
+                fontSize: 54,
                 lineHeight: 1.03,
-                marginBottom: 2,
-                textShadow: "0 2px 12px #fff9b5, 0 4px 32px #1b5c4e33,0 1.9px 7px #fee"
+                marginBottom: 3,
+                textShadow: "0 2px 12px #fff9b5, 0 4px 32px #1b5c4ecc"
               }}
               aria-label={c.label}
               role="img"
@@ -221,8 +227,8 @@ function MoviePropsInventory({ onBackToDashboard }) {
             </span>
             <span
               style={{
-                fontSize: 19,
-                color: "#074c52",
+                fontSize: 18,
+                color: "#164cae",
                 fontWeight: 900,
                 textAlign: "center",
                 letterSpacing: ".02em",
@@ -240,7 +246,7 @@ function MoviePropsInventory({ onBackToDashboard }) {
   if (quizOver)
     return (
       <QuizResult
-        score={userAnswers.filter((a) => a.wasCorrect).length}
+        score={userAnswers.filter(a => a.wasCorrect).length}
         total={QUESTIONS}
         answers={userAnswers}
         onHome={onBackToDashboard}
@@ -250,120 +256,124 @@ function MoviePropsInventory({ onBackToDashboard }) {
   if (!quizRounds[step]) return null;
 
   return (
-    <div className="container" style={{ paddingTop: 95, maxWidth: 510, marginBottom: 30 }}>
+    <div className="container" style={{ paddingTop: 92, maxWidth: 520, marginBottom: 36 }}>
       <button className="btn" style={{ marginBottom: 24 }} onClick={onBackToDashboard}>
         ⬅ Back
       </button>
       <QuizProgress current={step + 1} total={QUESTIONS} />
 
       <h2 className="title" style={{
-        fontSize: "1.45rem", marginBottom: 16, color: "#04608c", textShadow: "0 2px 8px #fff"
+        fontSize: "1.42rem", marginBottom: 15, color: "#1762b6",
+        letterSpacing: ".02em", textShadow: "0 2px 8px #ffd"
       }}>
         Movie Props Inventory
       </h2>
       <div
         className="description"
         style={{
-          marginBottom: 15,
-          color: "#f9f503",
-          fontWeight: 600,
+          marginBottom: 17,
+          color: "#f3ea03",
+          fontWeight: 700,
           fontSize: 17,
-          textShadow: "0 1.7px 8px #336"
+          textShadow: "0 1.7px 8px #234"
         }}
       >
-        Guess the Kollywood movie using these <span style={{ color: "#1e7ac7" }}>4 prop clues</span>. All clues are emoji props/icons!
+        Guess the Kollywood movie using these <span style={{ color: "#27acfa", fontWeight: 900 }}>4 prop clues</span>. Each clue is an emoji prop/icon!
       </div>
-      {renderPropClueBox(quizRounds[step].clues)}
+      {renderPropClues(quizRounds[step].clues)}
       <form
         onSubmit={handleSubmit}
-        style={{ marginBottom: 14, textAlign: "center" }}
+        style={{ marginBottom: 15, textAlign: "center" }}
         autoComplete="off"
         aria-label="Guess movie by prop clues"
       >
         <input
           type="text"
           placeholder="Your Guess (movie title)"
-          value={userAnswer}
-          onChange={e => setUserAnswer(e.target.value)}
+          value={userInput}
+          onChange={e => setUserInput(e.target.value)}
           autoFocus
-          disabled={reveal || !!showAnswerFeedback}
+          disabled={reveal || !!showFeedback}
           style={{
-            padding: "14px",
-            width: 220,
+            padding: "15px 10px",
+            width: 235,
             borderRadius: 7,
-            border: "2px solid #0ad09c",
+            border: "2px solid #16d8ce",
             fontSize: "1.09rem",
-            marginRight: 10,
-            marginBottom: 4,
-            boxShadow: "0 1px 9px #ffe46425",
-            background: reveal ? "#eee" : "#fff",
-            color: "#154265",
-            fontWeight: 700
+            marginRight: 9,
+            marginBottom: 3,
+            boxShadow: "0 1px 11px #ffe46435",
+            background: reveal ? "#f1f1f1" : "#fff",
+            color: "#164385",
+            fontWeight: 800,
+            letterSpacing: ".01em",
+            outline: "none"
           }}
           aria-label="Enter movie answer"
         />
-        {!reveal && !showAnswerFeedback && (
+        {!reveal && !showFeedback && (
           <button
             className="btn btn-large"
             type="submit"
             style={{
-              background: "#ffe14d",
-              color: "#232",
+              background: "#ffe336",
+              color: "#262",
               fontWeight: 900,
               fontSize: 16,
-              boxShadow: "0 1px 11px #ffe44e33"
+              boxShadow: "0 1px 10px #ffe44e44"
             }}
           >
             Submit
           </button>
         )}
       </form>
-      <div style={{ marginBottom: 11 }}>
+      <div style={{ marginBottom: 10 }}>
         <button
           type="button"
           className="btn"
           style={{
-            background: "#25b6e6",
-            color: "#ffe44b",
+            background: "#12cbac",
+            color: "#fff",
+            fontWeight: 800,
+            fontSize: 15,
             marginLeft: 3,
-            fontWeight: 700,
-            fontSize: 15
+            letterSpacing: ".01em"
           }}
           onClick={handleReveal}
-          disabled={reveal || showAnswerFeedback}
+          disabled={reveal || !!showFeedback}
         >
           Reveal Answer
         </button>
       </div>
-      {/* Feedback area (after submit/reveal) */}
-      {showAnswerFeedback && (
+      {/* Feedback area */}
+      {showFeedback && (
         <div
           style={{
-            marginTop: 20,
-            marginBottom: 9,
+            marginTop: 19,
+            marginBottom: 11,
             fontWeight: 900,
-            fontSize: 19,
-            color: showAnswerFeedback.correct ? "#15be3c" : "#da4f35",
-            letterSpacing: ".01em",
-            textShadow: showAnswerFeedback.correct
-              ? "0 1px 8px #35fa98,0 3px 19px #33ffaa44"
-              : "0 1px 8px #ee9a94,0 1.5px 12px #fde1e1",
-            background: showAnswerFeedback.correct ? "#fffdd8" : "#fff1ee",
-            borderRadius: 9,
-            padding: "10px 14px 5px 14px",
-            display: "inline-block"
+            fontSize: 20,
+            color: showFeedback.correct ? "#13b63c" : "#da4f35",
+            textShadow: showFeedback.correct
+              ? "0 2px 9px #35fa98,0 3px 19px #33faa084"
+              : "0 1.2px 3px #fde1e1,0 1.5px 9px #a13a09",
+            background: showFeedback.correct ? "#f6ffd8" : "#fff1ee",
+            borderRadius: 8,
+            padding: "10px 16px 5px 14px",
+            display: "inline-block",
+            letterSpacing: ".01em"
           }}
           aria-live="assertive"
         >
-          {showAnswerFeedback.correct
-            ? <>✔️ <span style={{ color: "#04608c" }}>Correct!</span> The movie was: <span style={{ color: "#e3a813" }}>{showAnswerFeedback.correctTitle}</span></>
-            : <>✖️ <span style={{ color: "#ae2b0b" }}>Incorrect.</span> {reveal ? "" : <>The answer: <span style={{ color: "#e3a813" }}>{showAnswerFeedback.correctTitle}</span></>}</>
+          {showFeedback.correct
+            ? <>✔️ <span style={{ color: "#04608c" }}>Correct!</span> The movie was: <span style={{ color: "#e3a813" }}>{showFeedback.correctTitle}</span></>
+            : <>✖️ <span style={{ color: "#a43424" }}>Incorrect.</span> {!reveal && <>The answer: <span style={{ color: "#e99113" }}>{showFeedback.correctTitle}</span></>}</>
           }
         </div>
       )}
 
-      <div style={{ color: "#789", fontSize: 13, marginTop: 16 }}>
-        All clues and answers are Kollywood movies only. Props shown as emoji/icons for maximum visibility.
+      <div style={{ color: "#969", fontSize: 13, marginTop: 13 }}>
+        All clues and answers are Kollywood. Props are selected for iconic importance. Enjoy!
       </div>
     </div>
   );
