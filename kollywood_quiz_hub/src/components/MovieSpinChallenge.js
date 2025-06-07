@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import QuizResult from "./QuizResult";
 
 /**
- * MovieSpinChallenge: Spin 3 wheels (actor, genre, location) from unique Kollywood movies,
+ * MovieSpinChallenge: Spin 3 wheels (hero, heroine, year released) from unique Kollywood movies,
  * prompt user to create or guess a matching movie, validate, and show result.
- * Replaces EmojiMovieQuiz.
  * PUBLIC_INTERFACE
  */
 const TMDB_API_KEY = "5bc67d3b06aecbd18121a3cbbc16eb59";
@@ -89,54 +88,39 @@ async function fetchMovieBatchFullDetails(movies, maxn = 20) {
 }
 
 /**
- * Extracts unique actors (top 8 billed), genres, and location keywords from batch of full-detail movies
- * Returns {actors:[], genres:[], locations:[]}
+ * Extracts unique heroes, heroines, and release years from batch of full-detail movies.
+ * Returns {heroes:[], heroines:[], years:[]}
  */
 function extractSpinOptions(movies) {
-  const actors = new Set();
-  const genres = new Set();
-  const locations = new Set();
+  const heroes = new Set();
+  const heroines = new Set();
+  const years = new Set();
+
   for (const movieWithDetails of movies) {
     const det = movieWithDetails.fullDetails;
-    // --- Actors ---
+    // --- Hero (male lead) and Heroine (female lead) ---
     if (det.credits && Array.isArray(det.credits.cast)) {
-      det.credits.cast
-        .slice(0, 8)
-        .forEach((a) => {
-          const name = a.name?.trim();
-          if (name && name.length > 1) actors.add(name);
-        });
-    }
-    // --- Genres ---
-    if (det.genres && Array.isArray(det.genres)) {
-      det.genres.forEach((g) => {
-        if (g.name) genres.add(g.name.trim());
-      });
-    }
-    // --- Locations: keywords (or try overviews with place clues) ---
-    if (det.keywords && Array.isArray(det.keywords.keywords)) {
-      det.keywords.keywords.forEach((kw) => {
-        if (
-          kw.name &&
-          /(city|village|street|road|chennai|madurai|school|college|temple|market|court|police|hospital|station|palace|factory|port|beach|india|mall|theatre|club|park|mountain|hill|river|forest|estate|island|bridge|house|bungalow|hostel|bus stand|train|airport)/i.test(
-            kw.name
-          )
-        ) {
-          locations.add(kw.name.trim());
-        }
-      });
-    }
-    // Fallback: parse overview for common location words as well.
-    if (
-      det.overview &&
-      /(chennai|madurai|trichy|pondicherry|kerala|village|city|school|college|hospital|temple|police station)/i.test(
-        det.overview
-      )
-    ) {
-      const matches = det.overview.match(
-        /(Chennai|Madurai|Trichy|Pondicherry|Kerala|village|city|school|college|hospital|temple|police station)/gi
+      // Hero: first male actor in the cast (Kollywood typical order: male lead usually billed before female)
+      const hero = det.credits.cast.find(
+        (a) =>
+          a.gender === 2 && // male in TMDB API
+          a.known_for_department === "Acting" &&
+          a.order < 4 // usually top 4
       );
-      if (matches) matches.forEach((loc) => locations.add(loc.trim()));
+      if (hero && hero.name && hero.name.length > 1) heroes.add(hero.name.trim());
+
+      // Heroine: first female actor in the cast
+      const heroine = det.credits.cast.find(
+        (a) =>
+          a.gender === 1 && // female in TMDB API
+          a.known_for_department === "Acting" &&
+          a.order < 5 // be lenient
+      );
+      if (heroine && heroine.name && heroine.name.length > 1) heroines.add(heroine.name.trim());
+    }
+    // --- Year Released ---
+    if (det.release_date && det.release_date.length >= 4) {
+      years.add(det.release_date.slice(0, 4));
     }
   }
   // Turn to arrays & shuffle for more variety
@@ -144,49 +128,10 @@ function extractSpinOptions(movies) {
     return arr.map(a => [a, Math.random()]).sort((a, b) => a[1] - b[1]).map(a => a[0]);
   }
   return {
-    actors: shuffle(Array.from(actors)),
-    genres: shuffle(Array.from(genres)),
-    locations: shuffle(Array.from(locations)),
+    heroes: shuffle(Array.from(heroes)),
+    heroines: shuffle(Array.from(heroines)),
+    years: shuffle(Array.from(years)),
   };
-}
-
-// Checks if the combination matches any of the movies (by actor, genre, and location keyword)
-function checkComboMatch(combo, movies) {
-  function normalizeSet(val) {
-    return (val || "").toLowerCase().trim();
-  }
-  return (
-    movies.find((movieWithDetails) => {
-      const fd = movieWithDetails.fullDetails;
-      const actorOk =
-        Array.isArray(fd.credits.cast) &&
-        fd.credits.cast.find(
-          (a) => normalizeSet(a.name) === normalizeSet(combo.actor)
-        );
-      const genreOk =
-        Array.isArray(fd.genres) &&
-        fd.genres.find(
-          (g) => normalizeSet(g.name) === normalizeSet(combo.genre)
-        );
-      let locationOk = false;
-      // Location: keyword or fallback to overview
-      if (
-        fd.keywords &&
-        Array.isArray(fd.keywords.keywords) &&
-        fd.keywords.keywords.find(
-          (k) => normalizeSet(k.name) === normalizeSet(combo.location)
-        )
-      ) {
-        locationOk = true;
-      } else if (
-        fd.overview &&
-        normalizeSet(fd.overview).includes(normalizeSet(combo.location))
-      ) {
-        locationOk = true;
-      }
-      return actorOk && genreOk && locationOk;
-    }) || null
-  );
 }
 
 // --- Persistent storage for past combos (for session) ---
@@ -204,8 +149,7 @@ function addMovieToPrevUsed(title) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(curr)));
 }
 
-// --- React Component ---
-
+// --- Spinner Wheel component ---
 function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
   // Visual "spinning" animation
   const [activeIdx, setActiveIdx] = useState(selectedIdx || 0);
@@ -221,13 +165,12 @@ function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
       setActiveIdx(selectedIdx || 0);
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
+    // eslint-disable-next-line
   }, [spinning, items.length, selectedIdx]);
   useEffect(() => {
     if (!spinning && onEnd) onEnd(items[activeIdx]);
     // eslint-disable-next-line
   }, [spinning]);
-  // Fade/scale for current
-  // Ensure high text contrast in wheels:
   // Label = blue shade (kept), value = pure white with strong shadow if needed
   return (
     <div
@@ -246,7 +189,7 @@ function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
           fontWeight: 600,
           color: "#15b6cc",
           marginBottom: 8,
-          textShadow: "0 2px 8px #fff, 0 1px 0px #013", // subtle light halo
+          textShadow: "0 2px 8px #fff, 0 1px 0px #013",
         }}
       >
         {label}
@@ -269,7 +212,7 @@ function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
           marginBottom: 4,
           userSelect: "none",
           color: "#fff",
-          textShadow: "0 1px 7px #000, 0 1px 22px #004f847c", // strong shadow for white text on blue bg
+          textShadow: "0 1px 7px #000, 0 1px 22px #004f847c",
           letterSpacing: ".02em",
         }}
       >
@@ -291,13 +234,13 @@ function MovieSpinChallenge({ onBackToDashboard }) {
   const [loadError, setLoadError] = useState("");
   const [movies, setMovies] = useState([]); // pool of unique, fullData
   const [spinOptions, setSpinOptions] = useState({
-    actors: [],
-    genres: [],
-    locations: [],
+    heroes: [],
+    heroines: [],
+    years: [],
   });
   // Wheel/spinning state
   const [spinning, setSpinning] = useState(false);
-  const [randomIdx, setRandomIdx] = useState({ actor: 0, genre: 0, location: 0 });
+  const [randomIdx, setRandomIdx] = useState({ hero: 0, heroine: 0, year: 0 });
   const [finalCombo, setFinalCombo] = useState(null);
   // Guess & Results
   const [userInput, setUserInput] = useState("");
@@ -306,7 +249,6 @@ function MovieSpinChallenge({ onBackToDashboard }) {
   const [matchingMovie, setMatchingMovie] = useState(null);
   const [quizOver, setQuizOver] = useState(false);
 
-  // Needed for robust "freshness"
   const prevUsedSet = getPrevUsedSet();
 
   // On mount: load fresh Kollywood movies & details, extract wheels
@@ -341,12 +283,12 @@ function MovieSpinChallenge({ onBackToDashboard }) {
       // Now extract wheels (unique, shuffled)
       const opts = extractSpinOptions(moviesWithDetails);
       if (
-        opts.actors.length < 4 ||
-        opts.genres.length < 3 ||
-        opts.locations.length < 2
+        opts.heroes.length < 2 ||
+        opts.heroines.length < 2 ||
+        opts.years.length < 2
       ) {
         setLoadError(
-          "Not enough actor/genre/location wheel options. Try again later."
+          "Not enough hero/heroine/year release wheel options. Try again later."
         );
         setLoading(false);
         return;
@@ -372,19 +314,19 @@ function MovieSpinChallenge({ onBackToDashboard }) {
     setFeedback("");
     // After 2.1 seconds, stop & pick at random
     setTimeout(() => {
-      const maxA = Math.max(0, spinOptions.actors.length - 1);
-      const maxG = Math.max(0, spinOptions.genres.length - 1);
-      const maxL = Math.max(0, spinOptions.locations.length - 1);
+      const maxHero = Math.max(0, spinOptions.heroes.length - 1);
+      const maxHeroine = Math.max(0, spinOptions.heroines.length - 1);
+      const maxYear = Math.max(0, spinOptions.years.length - 1);
       // Choose random indexes for each wheel
-      const a = Math.floor(Math.random() * (maxA + 1));
-      const g = Math.floor(Math.random() * (maxG + 1));
-      const l = Math.floor(Math.random() * (maxL + 1));
-      setRandomIdx({ actor: a, genre: g, location: l });
+      const heroIdx = Math.floor(Math.random() * (maxHero + 1));
+      const heroineIdx = Math.floor(Math.random() * (maxHeroine + 1));
+      const yearIdx = Math.floor(Math.random() * (maxYear + 1));
+      setRandomIdx({ hero: heroIdx, heroine: heroineIdx, year: yearIdx });
       setSpinning(false);
       setFinalCombo({
-        actor: spinOptions.actors[a],
-        genre: spinOptions.genres[g],
-        location: spinOptions.locations[l],
+        hero: spinOptions.heroes[heroIdx],
+        heroine: spinOptions.heroines[heroineIdx],
+        year: spinOptions.years[yearIdx],
       });
       setUserInput("");
     }, 2100 + Math.random() * 280);
@@ -401,17 +343,46 @@ function MovieSpinChallenge({ onBackToDashboard }) {
       comboMatch = movies.find((movieWithDetails) => {
         const t = (movieWithDetails.title || "") + " " + (movieWithDetails.fullDetails.title || "");
         // require all 3 combo to be present in this movie
-        const comboPassthrough = checkComboMatch(finalCombo, [movieWithDetails]);
+        const det = movieWithDetails.fullDetails;
+        let isHero = false, isHeroine = false, isYear = false;
+        if (det.credits && Array.isArray(det.credits.cast)) {
+          isHero =
+            det.credits.cast.find(
+              (a) => a.gender === 2 && a.name === finalCombo.hero
+            ) !== undefined;
+          isHeroine =
+            det.credits.cast.find(
+              (a) => a.gender === 1 && a.name === finalCombo.heroine
+            ) !== undefined;
+        }
+        if (det.release_date && det.release_date.slice(0, 4) === finalCombo.year)
+          isYear = true;
         // Allow for robust title matching (ignore case/punctuation)
         const guessOk =
           normalize(t) === normalize(userInput) ||
           (userInput &&
             normalize(movieWithDetails.title).includes(normalize(userInput)));
-        return comboPassthrough && guessOk;
+        return isHero && isHeroine && isYear && guessOk;
       });
     }
     // Also, get *a* matching movie from pool that fits combo (even if not user guess)
-    const fallbackAny = checkComboMatch(finalCombo, movies);
+    const fallbackAny = movies.find((movieWithDetails) => {
+      const det = movieWithDetails.fullDetails;
+      let isHero = false, isHeroine = false, isYear = false;
+      if (det.credits && Array.isArray(det.credits.cast)) {
+        isHero =
+          det.credits.cast.find(
+            (a) => a.gender === 2 && a.name === finalCombo.hero
+          ) !== undefined;
+        isHeroine =
+          det.credits.cast.find(
+            (a) => a.gender === 1 && a.name === finalCombo.heroine
+          ) !== undefined;
+      }
+      if (det.release_date && det.release_date.slice(0, 4) === finalCombo.year)
+        isYear = true;
+      return isHero && isHeroine && isYear;
+    });
 
     if (comboMatch) {
       // Correct!
@@ -448,7 +419,23 @@ function MovieSpinChallenge({ onBackToDashboard }) {
   // Handler: Reveal the correct movie for current combo (find and highlight in UI)
   function handleRevealAnswer() {
     if (!finalCombo) return;
-    const match = checkComboMatch(finalCombo, movies);
+    const match = movies.find((movieWithDetails) => {
+      const det = movieWithDetails.fullDetails;
+      let isHero = false, isHeroine = false, isYear = false;
+      if (det.credits && Array.isArray(det.credits.cast)) {
+        isHero =
+          det.credits.cast.find(
+            (a) => a.gender === 2 && a.name === finalCombo.hero
+          ) !== undefined;
+        isHeroine =
+          det.credits.cast.find(
+            (a) => a.gender === 1 && a.name === finalCombo.heroine
+          ) !== undefined;
+      }
+      if (det.release_date && det.release_date.slice(0, 4) === finalCombo.year)
+        isYear = true;
+      return isHero && isHeroine && isYear;
+    });
     setRevealMovie(match || null);
     setShowRevealHighlight(true);
     setShowResult(false);
@@ -557,19 +544,19 @@ function MovieSpinChallenge({ onBackToDashboard }) {
             >
               <b>Matched:</b>
               {" "}
-              <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalCombo.actor}</span>
+              <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalCombo.hero}</span>
               {" ● "}
-              <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalCombo.genre}</span>
+              <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalCombo.heroine}</span>
               {" ● "}
-              <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalCombo.location}</span>
+              <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalCombo.year}</span>
             </div>
           </>
         ) : (
           <span style={{ fontSize: 18, color: "#ffe100", fontWeight: 700, textShadow: "0 1px 7px #00090a" }}>
             No Kollywood movie from the grid matches <b>all three</b> of:<br />
-            <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalCombo.actor}</span> |{" "}
-            <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalCombo.genre}</span> |{" "}
-            <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalCombo.location}</span>
+            <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalCombo.hero}</span> |{" "}
+            <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalCombo.heroine}</span> |{" "}
+            <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalCombo.year}</span>
           </span>
         )}
         <div>
@@ -616,9 +603,9 @@ function MovieSpinChallenge({ onBackToDashboard }) {
         fontWeight: 600,
         textShadow: "0 1px 8px #222, 0 1px 12px #6464649c",
       }}>
-        Spin three wheels to get a Kollywood <b>Actor</b>, <b>Genre</b>, and <b>Location</b>.
+        Spin three wheels to get a Kollywood <b>Hero</b>, <b>Heroine</b>, and <b>Year Released</b>.
         Can you create or guess a Tamil movie that matches <b>all three</b>?<br />
-        <span style={{ color: "#fff", fontWeight: 400 }}>We'll check using TMDB data for only new, unused Kollywood movies!</span>
+        <span style={{ color: "#fff", fontWeight: 400 }}>We&apos;ll check using TMDB data for only new, unused Kollywood movies!</span>
       </div>
 
       {/* Main spinning-wheel row */}
@@ -632,25 +619,25 @@ function MovieSpinChallenge({ onBackToDashboard }) {
         }}
       >
         <SpinnerWheel
-          items={spinOptions.actors}
+          items={spinOptions.heroes}
           spinning={spinning}
           onEnd={() => {}}
-          selectedIdx={randomIdx.actor}
-          label="Actor"
+          selectedIdx={randomIdx.hero}
+          label="Hero"
         />
         <SpinnerWheel
-          items={spinOptions.genres}
+          items={spinOptions.heroines}
           spinning={spinning}
           onEnd={() => {}}
-          selectedIdx={randomIdx.genre}
-          label="Genre"
+          selectedIdx={randomIdx.heroine}
+          label="Heroine"
         />
         <SpinnerWheel
-          items={spinOptions.locations}
+          items={spinOptions.years}
           spinning={spinning}
           onEnd={() => {}}
-          selectedIdx={randomIdx.location}
-          label="Location"
+          selectedIdx={randomIdx.year}
+          label="Year Released"
         />
       </div>
       {/* Spin / re-spin button */}
@@ -704,21 +691,21 @@ function MovieSpinChallenge({ onBackToDashboard }) {
               color: "#24bec9", background: "#14232e", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
               fontWeight: 700, textShadow: "0 2px 10px #013, 0 1px 18px #1605"
             }}>
-              {finalCombo.actor}
+              {finalCombo.hero}
             </span>
             {" | "}
             <span style={{
               color: "#ffd700", background: "#524000", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
               fontWeight: 700, textShadow: "0 2px 13px #b36d05, 0 1px 18px #0008"
             }}>
-              {finalCombo.genre}
+              {finalCombo.heroine}
             </span>
             {" | "}
             <span style={{
               color: "#fff", background: "#5f24ad", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
               fontWeight: 700, textShadow: "0 2px 11px #29014f, 0 1px 17px #2e0145"
             }}>
-              {finalCombo.location}
+              {finalCombo.year}
             </span>
             <br />
             <span style={{ color: "#ffe43c", textShadow: "0 0 8px #000d" }}>
