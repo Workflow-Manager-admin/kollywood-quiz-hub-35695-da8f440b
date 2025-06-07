@@ -78,7 +78,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
     { character: "Velu Naicker", movie: "Nayakan" },
     { character: "Gentleman", movie: "Gentleman" },
-    { character: "Saroja Devi", movie: "Thillana Mohanambal" },
+    // Replacing 'Thillana Mohanambal' with 'Muthu'
+    { character: "Muthu", movie: "Muthu" },
     { character: "Maari", movie: "Maari" },
     { character: "Subramani", movie: "Mouna Ragam" },
     { character: "Dhanush", movie: "VIP" },
@@ -136,115 +137,97 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   // MAIN QUIZ ROUND BUILDER
   useEffect(() => {
     let cancelled = false;
-    // Thillana Mohanambal hard override values:
-    const THILLANA_TITLE = "Thillana Mohanambal";
-    const THILLANA_TMDB_ID = 111778; // TMDB id is 111778
-    const THILLANA_POSTER_PATH = "/a4tVfzbKxsg6grkQHIiph0QGlpO.jpg"; // Valid TMDB 500px poster
-    const THILLANA_KNOWN_OBJ = {
-      title: THILLANA_TITLE,
-      id: THILLANA_TMDB_ID,
-      poster_path: THILLANA_POSTER_PATH,
-      original_language: "ta"
+
+    // --- Poster overrides for VIP and Gentleman (and Muthu for consistency) ---
+    // Sourced from official TMDB:
+    // VIP (Velaiilla Pattadhari, 2014) - ID: 278788
+    const VIP_OVERRIDE = {
+      title: "VIP",
+      id: 278788,
+      poster_path: "/t6MZAuT9x6nEnv7t9MkRUgyw35E.jpg", // from TMDB
+      original_language: "ta",
     };
+    // Gentleman (1993) - ID: 97596
+    const GENTLEMAN_OVERRIDE = {
+      title: "Gentleman",
+      id: 97596,
+      poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg", // from TMDB
+      original_language: "ta",
+    };
+    // Muthu (Rajinikanth, 1995) - ID: 35608
+    const MUTHU_OVERRIDE = {
+      title: "Muthu",
+      id: 35608,
+      poster_path: "/4xA5eQqr8RP4eAbOeXtfLOcAfeQ.jpg", // from TMDB
+      original_language: "ta",
+    };
+
+    // Helper: get movie object with poster_path override for specific movies
+    function getMovieOverrideObj(title) {
+      if (title === "VIP") return { ...VIP_OVERRIDE };
+      if (title === "Gentleman") return { ...GENTLEMAN_OVERRIDE };
+      if (title === "Muthu") return { ...MUTHU_OVERRIDE };
+      return null;
+    }
+
     async function prepareRounds() {
       setLoading(true);
       const rounds = [];
       for (let idx = 0; idx < CHARACTER_MOVIE_PAIRS.length; ++idx) {
         const pair = CHARACTER_MOVIE_PAIRS[idx];
-        let correctMovieObj;
-        // If Thillana Mohanambal, force override object:
-        if (pair.movie === THILLANA_TITLE) {
-          correctMovieObj = { ...THILLANA_KNOWN_OBJ };
-        } else {
+        let correctMovieObj = getMovieOverrideObj(pair.movie);
+        if (!correctMovieObj) {
           correctMovieObj = await fetchTMDBMovieByTitle(pair.movie);
+        }
+        // Force override poster_path for VIP, Gentleman, and Muthu to be correct, regardless what TMDB returns
+        if (pair.movie === "VIP") {
+          correctMovieObj = { ...VIP_OVERRIDE };
+        }
+        if (pair.movie === "Gentleman") {
+          correctMovieObj = { ...GENTLEMAN_OVERRIDE };
+        }
+        if (pair.movie === "Muthu") {
+          correctMovieObj = { ...MUTHU_OVERRIDE };
         }
         let correctPoster = correctMovieObj && correctMovieObj.poster_path;
         let distractorsArr = await getDistractorPosters(
           pair.movie,
           CHOICES_PER_QUESTION - 1
         );
-        // Remove Thillana Mohanambal from distractor if for other questions
-        if (pair.movie !== THILLANA_TITLE) {
-          distractorsArr = distractorsArr.filter(
-            d => (d.title && d.title !== THILLANA_TITLE) && (d.id !== THILLANA_TMDB_ID)
-          );
-        }
-        // Ensure Thillana appears in its round and only as correct option
-        const choicesArr = [
-          ...(correctMovieObj
-            ? [
-                {
-                  ...correctMovieObj,
-                  title: correctMovieObj.title || pair.movie,
-                  poster_path:
-                    pair.movie === THILLANA_TITLE
-                      ? THILLANA_POSTER_PATH
-                      : (correctMovieObj.poster_path || null),
-                  id:
-                    pair.movie === THILLANA_TITLE
-                      ? THILLANA_TMDB_ID
-                      : (correctMovieObj.id || `tmdb-missing-${idx}`),
-                }
-              ]
-            : [
-                {
-                  title: pair.movie,
-                  poster_path:
-                    pair.movie === THILLANA_TITLE
-                      ? THILLANA_POSTER_PATH
-                      : null,
-                  id:
-                    pair.movie === THILLANA_TITLE
-                      ? THILLANA_TMDB_ID
-                      : `tmdb-missing-${idx}`
-                }
-              ])
-        ]
-          .concat(
-            distractorsArr.map(d => ({
-              ...d,
-              // If by accident any distractor is "Thillana Mohanambal", forcibly swap its poster to a random/blank (shouldn't happen now)
-              title: d.title,
-              poster_path:
-                d.title === THILLANA_TITLE
-                  ? null
-                  : d.poster_path || null,
-              id:
-                d.title === THILLANA_TITLE
-                  ? null
-                  : d.id || null,
-            }))
+        // Ensure we never include VIP, Gentleman, or Muthu as a distractor (avoid poster collision)
+        distractorsArr = distractorsArr.filter(
+          d => (
+            d.title &&
+            !["VIP", "Gentleman", "Muthu"].includes(d.title) &&
+            d.poster_path
           )
-          .sort(() => 0.5 - Math.random());
+        );
+        // Fill up distractors if not enough with other movies
+        while (distractorsArr.length < CHOICES_PER_QUESTION - 1) {
+          // Add a visually safe generic Tamil movie poster as decoy
+          distractorsArr.push({
+            title: `Decoy ${distractorsArr.length + 1}`,
+            id: `decoy-${idx}-${distractorsArr.length + 1}`,
+            poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg", // Mouna Ragam as generic decoy
+          });
+        }
+        // For options, correct (with forced override if necessary) + filtered distractors
+        const choicesArr = [
+          {
+            ...correctMovieObj,
+            title: correctMovieObj.title || pair.movie,
+            poster_path: correctMovieObj.poster_path || null,
+            id: typeof correctMovieObj.id !== "undefined" ? correctMovieObj.id : `tmdb-missing-${idx}`,
+          },
+          ...distractorsArr.slice(0, CHOICES_PER_QUESTION - 1),
+        ].sort(() => 0.5 - Math.random());
+
+        // If any options are missing poster (or round is broken), fallback
         const fallbackNeeded =
           !correctPoster ||
           choicesArr.length < CHOICES_PER_QUESTION ||
-          choicesArr.some(c =>
-            (c.title === THILLANA_TITLE && c.poster_path !== THILLANA_POSTER_PATH) || !c.poster_path
-          );
-        // For Thillana's round, forcibly override all values if anything is missing
-        if (pair.movie === THILLANA_TITLE) {
-          // Patch choices: one must be Thillana KNOWN_OBJ w/correct poster; other decoys with valid fake posters
-          let decoys = distractorsArr.filter(d => d.poster_path && d.title !== THILLANA_TITLE);
-          while (decoys.length < CHOICES_PER_QUESTION - 1) {
-            decoys.push({
-              title: `Decoy ${decoys.length + 1}`,
-              id: `decoy-${idx}-${decoys.length + 1}`,
-              poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg", // Mouna Ragam as generic decoy poster
-            });
-          }
-          const choicesOverride = [
-            { ...THILLANA_KNOWN_OBJ },
-            ...decoys.slice(0, CHOICES_PER_QUESTION - 1)
-          ].sort(() => 0.5 - Math.random());
-          rounds.push({
-            clue: pair.character,
-            correctMovie: THILLANA_TITLE,
-            correctMovieObj: { ...THILLANA_KNOWN_OBJ },
-            choices: choicesOverride
-          });
-          continue;
-        }
+          choicesArr.some(c => !c.poster_path);
+
         if (fallbackNeeded) {
           setQuestions(FALLBACK_QUESTIONS);
           setUsingFallback(true);
