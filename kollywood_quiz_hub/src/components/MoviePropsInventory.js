@@ -124,83 +124,110 @@ function MoviePropsInventory({ onBackToDashboard }) {
       .map(a => a[0]);
   }
 
-  // Tries to extract 4 highly unique/strong prop clues from TMDB movie details
-  // Returns [{label, emoji (sometimes), source}]
-  function tmdbToPropsClues(tmdbMovie, tmdbKeywordsList) {
-    // Extract genres, keywords, notable objects from overview
+  /**
+   * Extract up to 4 highly unique and concrete prop clues from TMDB movie details + keywords.
+   * Each clue should maximize uniqueness for this title in the round.
+   * Returns: array of { label, emoji (optional), source }
+   */
+  function tmdbToPropsClues(tmdbMovie, tmdbKeywordsList, otherMovieTitles = []) {
     if (!tmdbMovie) return null;
     let clues = [];
-    // Try genres as first clue
-    if (tmdbMovie.genres && tmdbMovie.genres.length) {
-      clues.push({
-        label: "Genre: " + tmdbMovie.genres[0].name,
-        emoji: null,
-        source: "genre"
-      });
-    }
-    // Use keywords from TMDB
-    if (tmdbKeywordsList && tmdbKeywordsList.length > 0) {
-      // Pick only those that are concrete objects/themes, ignore generic like 'tamil', 'movie', 'love'
-      const IGNORE = ["tamil", "film", "movie", "love", "life", "story", "india", "man", "woman", "music", "song", "family"];
-      const goodKw = tmdbKeywordsList.filter(
-        k => typeof k.name === "string" && k.name.length > 2 && !IGNORE.includes(k.name.toLowerCase())
+    const used = new Set();
+    // 1. Gather unique TMDB keywords (ignore generic ones and ones used in other round movies)
+    const BLACKLIST = [
+      "tamil", "film", "movie", "love", "life", "story", "india", "man", "woman", "music", "song", "family",
+      "romance", "drama", "friendship", "relationship", "marriage", "death", "revenge", "child", "time", "boy", "girl"
+    ];
+    let goodKw = [];
+    if (Array.isArray(tmdbKeywordsList)) {
+      goodKw = tmdbKeywordsList.filter(
+        k =>
+          typeof k.name === "string"
+          && k.name.length > 2
+          && !BLACKLIST.includes(k.name.toLowerCase())
+          && !otherMovieTitles.some(title =>
+            title.toLowerCase().includes(k.name.toLowerCase())
+          )
       );
-      // Pick up to 2
-      goodKw.slice(0, 2).forEach(kw =>
-        clues.push({
-          label: "Prop: " + kw.name,
-          emoji: null,
-          source: "keyword"
-        })
-      );
+      // Penalize keywords that are also found in other pool movies' titles to boost uniqueness
     }
-    // Try picking an object or visual in plot (overview)
+    // 2. Concrete objects from overview
+    let objWords = [];
     if (tmdbMovie.overview) {
-      // Example objects to look for
-      const OBJ_PATTERNS = [
-        /ring|gun|cycle|cigar|auto|robot|palace|lion|detective|flag|violin|police|bride|bag|rain|umbrella|snake|horse|pot|money|bacon|tv|electricity|trench coat|turban|slum|strongman|heartbreak|glasses|cane|car|bottle|musician|suitcase/i
-      ];
-      const matches = tmdbMovie.overview.match(OBJ_PATTERNS[0]);
-      if (matches) {
-        clues.push({
-          label: "Object: " + matches[0].charAt(0).toUpperCase() + matches[0].slice(1),
-          emoji: null,
-          source: "overview"
-        });
+      // Look for known prop words in plot that are NOT in any of the other movie titles.
+      const OBJ_REGEX = /\b(ring|gun|cycle|cigar|auto|robot|palace|lion|detective|flag|violin|police|bride|bag|rain|umbrella|snake|horse|pot|money|bacon|tv|electricity|trench coat|turban|slum|strongman|heartbreak|glasses|cane|car|bottle|musician|suitcase|cane|poster|sword|hammer|typewriter|train|doll|school|bus|boat|uniform|jacket|crown|phone|helmet|mask|watch|letter)\b/gi;
+      let match;
+      while ((match = OBJ_REGEX.exec(tmdbMovie.overview)) !== null) {
+        const obj = match[1];
+        // Unique wrt movie titles for this session
+        if (!otherMovieTitles.some(title => title.toLowerCase().includes(obj.toLowerCase())) && !used.has(obj)) {
+          objWords.push(obj);
+          used.add(obj);
+        }
       }
     }
-    // Add release year as last resort only if not yet enough clues
-    if (clues.length < 4 && tmdbMovie.release_date) {
-      clues.push({
-        label: "Year: " + tmdbMovie.release_date.slice(0, 4),
-        emoji: null,
-        source: "release"
-      });
+    // 3. Genre (rarely unique; but use only if not in pool and not very generic)
+    let genreClue = null;
+    if (tmdbMovie.genres && tmdbMovie.genres.length) {
+      // If this genre is not present (textually) in other movie titles for the round
+      const gn = tmdbMovie.genres[0].name;
+      if (!otherMovieTitles.some(title => title.toLowerCase().includes(gn.toLowerCase())) && !BLACKLIST.includes(gn.toLowerCase())) {
+        genreClue = gn;
+      }
     }
-    // Only return if at least 3 clues (with at least 2 unique); better fallback when <3
-    // Remove repeats by label
-    clues = clues.filter(
-      (cl, idx, arr) => arr.findIndex(c2 => c2.label === cl.label) === idx
+    // 4. Year (absolute fallback, only if not in other movies' titles or existing clues, low priority)
+    let yearClue = null;
+    if (tmdbMovie.release_date && tmdbMovie.release_date.length >= 4) {
+      const yr = tmdbMovie.release_date.slice(0, 4);
+      if (!otherMovieTitles.some(title => title.includes(yr))) {
+        yearClue = yr;
+      }
+    }
+    // --- Compose prop clues with priority: objects, keyword, genre, year ---
+    // Add up to 2 unique object props
+    objWords.slice(0, 2).forEach((word) => {
+      clues.push({ label: word.charAt(0).toUpperCase() + word.slice(1), emoji: null, source: "object" });
+    });
+    // Add up to 2 high-salience keywords
+    goodKw.slice(0, 2).forEach((kw) => {
+      if (!used.has(kw.name)) {
+        clues.push({ label: kw.name.charAt(0).toUpperCase() + kw.name.slice(1), emoji: null, source: "keyword" });
+        used.add(kw.name);
+      }
+    });
+    // Add unique genre
+    if (genreClue && clues.length < 4) {
+      clues.push({ label: "Genre: " + genreClue, emoji: null, source: "genre" });
+      used.add(genreClue);
+    }
+    // Add year if necessary
+    if (yearClue && clues.length < 4) {
+      clues.push({ label: "Year: " + yearClue, emoji: null, source: "year" });
+      used.add(yearClue);
+    }
+    // Remove any duplicate labels
+    clues = clues.filter((cl, idx, arr) =>
+      arr.findIndex(c2 => c2.label === cl.label) === idx
     );
-    if (clues.length < 3) return null;
-    // Add up to 4 only
-    return clues.slice(0, 4);
+    // If 4 are available and all are reasonably unique, keep. Otherwise, fail out for fallback.
+    if (clues.length >= 4) {
+      return clues.slice(0, 4);
+    }
+    return null;
   }
 
-  // Promisified function: Try to fetch TMDB clues for up to n unique Kollywood movies
-  // If enough clues cannot be constructed from TMDB data, fallback to curated
+  // Promisified function: For n rounds, fetch Kollywood movies, ensure each gets 4 highly accurate prop clues using TMDB data (or curated fallback).
+  // Each clue set must be highly unique to the movie given the round's movie pool.
   async function generatePropRoundsFromTMDB(numRounds) {
     try {
-      // Use up to 3 discovery pages to ensure variety
+      // Fetch candidate Kollywood movies (double pool for flexibility)
       const allKollywood = [];
       let page = 1, seenTitles = new Set();
-      // Use discover first, up to 3 pages (60 movies), filter for unique titles
-      while (allKollywood.length < numRounds * 2 && page <= 3) {
-        // Use fetchKollywoodMovies() to get Tamil movies, but it's only 1 page; so use tmdbGet for paged
+      while (allKollywood.length < numRounds * 2 && page <= 4) {
         const res = await tmdbGet("/discover/movie", {
           with_original_language: "ta",
           sort_by: "popularity.desc",
-          page
+          page,
         });
         if (res && res.results) {
           res.results.forEach(m => {
@@ -212,15 +239,21 @@ function MoviePropsInventory({ onBackToDashboard }) {
         }
         page += 1;
       }
-      // Shuffle, unique up to numRounds count
-      const pool = shuffle(allKollywood).slice(0, numRounds * 2); // double count for chance
+      // Prepare pool and ensure all titles are unique
+      const pool = shuffle(allKollywood).slice(0, numRounds * 2);
       const usedTitles = new Set();
       const rounds = [];
-      // For each, fetch keywords/details, generate up to 4 unique prop clues for this movie
+      // To ensure clues are specific per-movie, gather all round titles for context
+      const poolTitlesLower = pool.map(m => (m?.title || "").trim().toLowerCase());
       for (let i = 0; rounds.length < numRounds && i < pool.length; ++i) {
         const movie = pool[i];
         if (!movie || !movie.id || usedTitles.has(movie.title.trim().toLowerCase())) continue;
-        // Fetch keywords and full movie details
+
+        // Exclude this movie's title from "other" titles for clue generation
+        const thisMovieTitle = movie.title.trim().toLowerCase();
+        const otherRoundTitles = poolTitlesLower.filter(t => t && t !== thisMovieTitle);
+
+        // Fetch fresh/BEST keywords and details
         let tmdbKeywordsList = [];
         let tmdbDetails = null;
         try {
@@ -236,34 +269,33 @@ function MoviePropsInventory({ onBackToDashboard }) {
             release_date: details?.release_date || movie?.release_date || ""
           };
         } catch {}
-        // Try to generate prop clues from TMDB data
-        let clues = tmdbToPropsClues(tmdbDetails, tmdbKeywordsList);
-        // If not enough, fallback to hardcoded if present for this movie's title
-        if (!clues || clues.length < 3) {
-          // try to find in fallback
+        // Try to generate prop clues from TMDB with "movie context" for maximum uniqueness
+        let clues = tmdbToPropsClues(tmdbDetails, tmdbKeywordsList, otherRoundTitles);
+        // If 4 aren't available, fallback to curated set
+        if (!clues || clues.length < 4) {
           const fallback = FALLBACK_PROP_CLUES.find(
             f => f.answer.toLowerCase() === movie.title.trim().toLowerCase()
           );
-          if (fallback) {
+          if (fallback && fallback.clues && fallback.clues.length === 4) {
             clues = fallback.clues;
           } else {
-            continue; // skip this movie, not enough clues!
+            continue; // cannot construct a uniquely identifying clue set, skip
           }
         }
-        // Don't allow any movie repeats in a session
-        usedTitles.add(movie.title.trim().toLowerCase());
+        usedTitles.add(thisMovieTitle);
         rounds.push({
           answer: movie.title,
           clues: clues.map(prop =>
             prop.emoji
               ? { ...prop }
-              : { emoji: "", label: prop.label }
+              : { emoji: prop.emoji || "", label: prop.label }
           )
         });
       }
+      // Only return if all clues are sufficiently unique & rounds complete
       return rounds.length >= numRounds ? rounds.slice(0, numRounds) : null;
     } catch {
-      return null; // API error, fallback
+      return null;
     }
   }
 
