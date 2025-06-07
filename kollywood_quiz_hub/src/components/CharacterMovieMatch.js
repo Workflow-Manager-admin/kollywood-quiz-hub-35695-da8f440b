@@ -86,7 +86,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Rangasamy", movie: "Sivaji" }
   ];
 
-  // State management (keep only ONE declaration and one useEffect for quiz API logic!)
+  // State
   const [questions, setQuestions] = useState([]);
   const [step, setStep] = useState(0);
   const [dragActive, setDragActive] = useState(false);
@@ -102,7 +102,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 
   // Helper: get movie poster_path (from cache or fetch)
   async function getPosterForTitle(title) {
-    // Try exact cache
     if (posterCache[title]) return posterCache[title];
     const movie = await fetchTMDBMovieByTitle(title);
     if (movie && movie.poster_path) {
@@ -114,10 +113,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }
   }
 
-  // Helper: get n random distractor movies except excluding given
+  // Helper: get n random distractors except excluding given
   async function getDistractorPosters(correctTitle, n) {
-    // For Tamil, we can use popularity list for some candidates
-    // We fetch from /discover/movie to get a pool
     const discoverUrl = `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_original_language=ta&sort_by=popularity.desc`;
     try {
       const resp = await fetch(discoverUrl);
@@ -126,7 +123,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       const options = (data.results || []).filter(d =>
         d.title && d.title !== correctTitle && d.poster_path
       );
-      // Shuffle and sample n
       for (let i = options.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [options[i], options[j]] = [options[j], options[i]];
@@ -139,7 +135,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 
   // MAIN QUIZ ROUND BUILDER
   useEffect(() => {
-    // Build quiz rounds dynamically using TMDB, or fallback if not enough
     let cancelled = false;
     async function prepareRounds() {
       setLoading(true);
@@ -147,14 +142,11 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       for (let idx = 0; idx < CHARACTER_MOVIE_PAIRS.length; ++idx) {
         const pair = CHARACTER_MOVIE_PAIRS[idx];
         const correctMovieObj = await fetchTMDBMovieByTitle(pair.movie);
-        // Get poster for correct movie
         let correctPoster = correctMovieObj && correctMovieObj.poster_path;
-        // For distractors (try to avoid duplicates/title collision)
         const distractorsArr = await getDistractorPosters(
           pair.movie,
           CHOICES_PER_QUESTION - 1
         );
-        // Compose choices (at least 1 correct, 3 distractors)
         const choicesArr = [
           ...(correctMovieObj
             ? [
@@ -182,7 +174,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             }))
           )
           .sort(() => 0.5 - Math.random());
-        // If any missing posters or not enough distractors, or not enough questions, bail to fallback
         const fallbackNeeded =
           !correctPoster ||
           choicesArr.length < CHOICES_PER_QUESTION ||
@@ -200,14 +191,12 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           choices: choicesArr
         });
       }
-      // Defensive: If API fails to yield enough valid rounds, fallback to demo
       if (rounds.length < 1 || rounds[0]?.choices?.length < 1) {
         setQuestions(FALLBACK_QUESTIONS);
         setUsingFallback(true);
         setLoading(false);
         return;
       }
-      // Use only QUESTIONS count
       const selectedRounds = rounds.slice(0, QUESTIONS);
       if (!cancelled) {
         setQuestions(selectedRounds);
@@ -222,20 +211,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     // eslint-disable-next-line
   }, []);
 
-  // --- legacy/duplicate logic removed, only one source of truth remains for questions state and useEffect round fetching! ---
-
-
-  // Build rounds from API or fallback on mount
-  // The TMDB fetching and question-setting is now handled above.
-
-  // =======================
-  // REMOVE: Additional legacy/fallback fetching logic for questions (if present)
-  // =======================
-
-  // Only keep the modern TMDB fetching & question preparation useEffect above.
-
-
-  // Drag/drop handlers
+  // Drag and Drop Handlers
   function handleDragStart() {
     setDraggedClue(questions[step]);
     setDragActive(true);
@@ -265,12 +241,10 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 
   // PUBLIC_INTERFACE
   /**
-   * Records the user's answer for the current round by using movie IDs (preferred) and titles,
-   * ensuring both user's answer and correct answer are always stored with persistent identifiers.
-   * All result comparison is done by ID if available, else by normalized title.
+   * Records the user's answer with strict type and value checks on IDs, fallback to normalized title.
+   * All result comparison done strictly.
    */
   function recordAnswer(selectedMovieObj) {
-    // Find the correct movie object in choices/fallback, prioritizing TMDB ID
     const correctChoice =
       questions[step].choices.find(
         c =>
@@ -283,28 +257,69 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       questions[step].choices.find(c => c.title === questions[step].correctMovie) ||
       null;
 
-    // Defensive title normalization for matching if ID unavailable
-    const isCorrect =
-      (selectedMovieObj.id &&
-        correctChoice &&
-        String(selectedMovieObj.id) === String(correctChoice.id)) ||
-      (
-        !selectedMovieObj.id &&
-        correctChoice &&
-        selectedMovieObj.title &&
-        correctChoice.title &&
-        selectedMovieObj.title.toLowerCase().trim() === correctChoice.title.toLowerCase().trim()
+    let isCorrect = false;
+    let idCompare = false;
+    let titleCompare = false;
+
+    if (
+      selectedMovieObj &&
+      correctChoice &&
+      typeof selectedMovieObj.id !== "undefined" &&
+      typeof correctChoice.id !== "undefined" &&
+      selectedMovieObj.id !== null &&
+      correctChoice.id !== null
+    ) {
+      // Compare types and values as strings
+      idCompare = String(selectedMovieObj.id) === String(correctChoice.id);
+      isCorrect = idCompare;
+    }
+    if (!isCorrect && selectedMovieObj && correctChoice) {
+      if (
+        typeof selectedMovieObj.title === "string" &&
+        typeof correctChoice.title === "string"
+      ) {
+        const normAnswer = selectedMovieObj.title.toLowerCase().trim();
+        const normCorrect = correctChoice.title.toLowerCase().trim();
+        titleCompare = normAnswer === normCorrect;
+        isCorrect = titleCompare;
+      }
+    }
+
+    // Debug print
+    if (window?.console) {
+      console.log(
+        "[CharacterMovieMatch][RECORD_ANSWER]",
+        {
+          user_answer: {
+            id: selectedMovieObj?.id,
+            idType: typeof selectedMovieObj?.id,
+            title: selectedMovieObj?.title,
+            titleType: typeof selectedMovieObj?.title,
+          },
+          correct: {
+            id: correctChoice?.id,
+            idType: typeof correctChoice?.id,
+            title: correctChoice?.title,
+            titleType: typeof correctChoice?.title,
+          },
+          idCompare,
+          titleCompare,
+          selectedMovieObj,
+          correctChoice,
+          result: isCorrect,
+        }
       );
+    }
 
     setUserAnswers(prev => [
       ...prev,
       {
         character: questions[step].clue,
-        answerId: selectedMovieObj.id || null,
+        answerId: typeof selectedMovieObj.id !== "undefined" ? String(selectedMovieObj.id) : null,
         answerTitle: selectedMovieObj.title,
         answerPoster: selectedMovieObj.poster_path || null,
         wasCorrect: !!isCorrect,
-        correctId: correctChoice?.id || null,
+        correctId: correctChoice?.id != null ? String(correctChoice.id) : null,
         correctTitle: correctChoice?.title || questions[step].correctMovie,
         correctPoster: correctChoice?.poster_path || null,
       }
@@ -361,9 +376,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 
   // Defensive/fallback for missing question
   if (!questions[step]) {
-    // Show fallback -- and if this is due to quiz end, show result page using a structure similar to normal answers
     if (quizOver && userAnswers.length >= 1) {
-      // Go to final result using whatever answers available (for safety)
       return (
         <QuizResult
           score={userAnswers.filter(a => a.wasCorrect).length}
@@ -375,11 +388,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       );
     }
 
-    // Otherwise, just show fallback first round
     const fb = FALLBACK_QUESTIONS[0];
-    // Optionally, match fallback answer for result page structure
     if (userAnswers.length === QUESTIONS) {
-      // All fallback rounds were answered, show results
       return (
         <QuizResult
           score={userAnswers.filter(a => a.wasCorrect).length}
@@ -596,9 +606,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           {Array.isArray(question.choices) && question.choices.length > 0 ? (
             <React.Fragment>
               {question.choices.map((movieObj, idx) => {
-                // Always log poster info for diagnostics
                 if (window?.console) {
-                  // Poster URL logging per requirement
                   console.log(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}]`, {
                     title: movieObj.title,
                     poster_path: movieObj.poster_path,
@@ -608,6 +616,22 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                   if (!movieObj.poster_path) {
                     console.warn(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}] poster_path missing`, movieObj);
                   }
+                }
+                // Visual results: compute strict correctness for the tick/cross and border
+                let isDropCorrect = false;
+                if (
+                  typeof question.correctMovieObj?.id !== "undefined" &&
+                  typeof movieObj.id !== "undefined"
+                ) {
+                  isDropCorrect =
+                    String(movieObj.id) === String(question.correctMovieObj.id);
+                } else if (
+                  typeof question.correctMovieObj?.title === "string" &&
+                  typeof movieObj.title === "string"
+                ) {
+                  isDropCorrect =
+                    movieObj.title.toLowerCase().trim() ===
+                    question.correctMovieObj.title.toLowerCase().trim();
                 }
                 return (
                   <div
@@ -620,7 +644,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                       minWidth: 130,
                       minHeight: 210,
                       border: answeredIdx === idx
-                        ? (movieObj.title === question.correctMovie ? "3px solid #2acd86" : "3px solid #da364a")
+                        ? (isDropCorrect ? "3px solid #2acd86" : "3px solid #da364a")
                         : "2px solid #bae8f7",
                       borderRadius: 12,
                       alignItems: "center",
@@ -633,7 +657,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                       margin: 6,
                       cursor: dragActive && !reveal ? "pointer" : "default",
                       boxShadow: answeredIdx === idx
-                        ? (movieObj.title === question.correctMovie ? "0 0 18px #49f1b7" : "0 0 14px #ffb2bc")
+                        ? (isDropCorrect ? "0 0 18px #49f1b7" : "0 0 14px #ffb2bc")
                         : "0 3px 10px #ecf2fb",
                       opacity: dragActive ? 0.93 : 1,
                       position: "relative",
@@ -709,9 +733,9 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                         right: 10,
                         top: 10,
                         fontSize: 32,
-                        color: movieObj.title === question.correctMovie ? "#2acd86" : "#ed2e40"
+                        color: isDropCorrect ? "#2acd86" : "#ed2e40"
                       }}>
-                        {movieObj.title === question.correctMovie ? "✔️" : "✖️"}
+                        {isDropCorrect ? "✔️" : "✖️"}
                       </span>
                     )}
                   </div>
