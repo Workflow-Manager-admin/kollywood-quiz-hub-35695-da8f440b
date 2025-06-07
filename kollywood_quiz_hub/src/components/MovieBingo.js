@@ -295,12 +295,17 @@ function MovieBingo({ onBackToDashboard }) {
   const [error, setError] = useState("");
   const [movies, setMovies] = useState([]); // 9 unique movie objects
   const [questions, setQuestions] = useState([]); // 9 {question, find, checker}
-  const [round, setRound] = useState(0); // 0..8
+  const [round, setRound] = useState(0); // 0..skip/total
   // For each cell, stores: null if never selected, else {status: 'correct'|'wrong'}
   const [gridLockStates, setGridLockStates] = useState(Array(N).fill(null));
   const [cellFeedback, setCellFeedback] = useState({idx: null, correctIdx: null, result: null}); // {idx, correctIdx, result}
   const [feedbackStates, setFeedbackStates] = useState([]); // [{clicked: idx, correctIdx: idx, status:'correct'|'wrong'}...]
   const [quizCompleted, setQuizCompleted] = useState(false);
+
+  // New skip state
+  // skippedRounds: indices of questions that were skipped and need to be revisited
+  const [skippedRounds, setSkippedRounds] = useState([]); // stores indices of skipped questions
+  const [phase, setPhase] = useState('initial'); // 'initial' for first 9, 'review-skipped' for skipped, 'done' for finished
 
   // Bootstrap: fetch grid, enhance with TMDB data, generate unique questions
   useEffect(() => {
@@ -313,6 +318,8 @@ function MovieBingo({ onBackToDashboard }) {
       setRound(0);
       setGridLockStates(Array(N).fill(null));
       setCellFeedback({idx: null, correctIdx: null, result: null});
+      setSkippedRounds([]);
+      setPhase('initial');
 
       // Step 1. Get 9 unique movies
       let bingoMovies = [];
@@ -362,6 +369,8 @@ function MovieBingo({ onBackToDashboard }) {
       setRound(0);
       setGridLockStates(Array(N).fill(null));
       setCellFeedback({idx: null, correctIdx: null, result: null});
+      setSkippedRounds([]);
+      setPhase('initial');
     }
     start();
     return () => { isMounted = false; }
@@ -377,8 +386,14 @@ function MovieBingo({ onBackToDashboard }) {
       !movies[idx]
     ) return;
 
+    // Determine which round index we're actually on (for review-skipped phase) 
+    let realRound = round;
+    if (phase === 'review-skipped') {
+      realRound = skippedRounds[round];
+    }
+
     // Determine correct movie for this round using current question object
-    const questionObj = questions[round];
+    const questionObj = questions[realRound];
     const correctIdx = questionObj.answerIdx;
     const wasCorrect = idx === correctIdx;
     const correctAns = movies[correctIdx];
@@ -386,7 +401,7 @@ function MovieBingo({ onBackToDashboard }) {
     // Lock-in state and show feedback
     setGridLockStates(prev => {
       const out = [...prev];
-      out[idx] = { status: wasCorrect ? "correct" : "wrong", round, question: questionObj.question };
+      out[idx] = { status: wasCorrect ? "correct" : "wrong", round: realRound, question: questionObj.question };
       return out;
     });
 
@@ -394,28 +409,66 @@ function MovieBingo({ onBackToDashboard }) {
     setFeedbackStates(prev => [
       ...prev,
       {
-        round, cell: idx, status: wasCorrect ? "correct" : "wrong",
+        round: realRound, cell: idx, status: wasCorrect ? "correct" : "wrong",
         correctIdx, chosenTitle: movies[idx].title, correctTitle: correctAns && correctAns.title, question: questionObj.question
       }
     ]);
 
     setTimeout(() => {
       setCellFeedback({idx: null, correctIdx: null, result: null});
-      if (round === N - 1) {
-        setQuizCompleted(true);
-      } else {
-        setRound(r => r + 1);
+      if (phase === 'initial') {
+        if (realRound === N - 1) {
+          // All 9 normal rounds done, check if there are skipped
+          if (skippedRounds.length > 0) {
+            setPhase('review-skipped');
+            setRound(0);
+          } else {
+            setQuizCompleted(true);
+          }
+        } else {
+          setRound(r => r + 1);
+        }
+      } else if (phase === 'review-skipped') {
+        if (round === skippedRounds.length - 1) {
+          setQuizCompleted(true);
+        } else {
+          setRound(r => r + 1);
+        }
       }
     }, 950);
   }
 
   // On finish, compile answer/result array to match conventions
   function getResults() {
-    return feedbackStates.map((f, i) => ({
+    // Compose full list, marking skipped questions with guess: '[skipped]'
+    // and wasCorrect: false
+    let results = [...feedbackStates];
+    // When a skipped round was never revisited (edge), this records it as skipped as well
+    let answeredRounds = new Set(results.map(f => f.round));
+    if (skippedRounds.length > 0) {
+      skippedRounds.forEach(skippedIdx => {
+        if (!answeredRounds.has(skippedIdx)) {
+          // Use the data available from questions/movies
+          results.push({
+            round: skippedIdx,
+            cell: null,
+            status: 'skipped',
+            correctIdx: questions[skippedIdx].answerIdx,
+            chosenTitle: '[skipped]',
+            correctTitle: movies[questions[skippedIdx].answerIdx]?.title,
+            question: questions[skippedIdx].question,
+          });
+        }
+      });
+    }
+    // Sort by original question order (round index)
+    results.sort((a, b) => a.round - b.round);
+    return results.map((f) => ({
       guess: f.chosenTitle,
       correct: f.correctTitle,
       wasCorrect: f.status === "correct",
-      question: f.question
+      question: f.question,
+      skipped: f.status === "skipped"
     }));
   }
 
@@ -446,8 +499,12 @@ function MovieBingo({ onBackToDashboard }) {
       </div>
     );
 
-  // Main grid
-  const currQ = questions[round];
+  // Figure out which index to use for question if skipped phase
+  let realRound = round;
+  if (phase === 'review-skipped') {
+    realRound = skippedRounds[round];
+  }
+  const currQ = questions[realRound];
   const nCols = 3;
   const gridStyle = {
     display: "grid",
@@ -463,6 +520,34 @@ function MovieBingo({ onBackToDashboard }) {
   // Use answer index from questionObj for correctness feedback
   const currAnsIdx = currQ ? currQ.answerIdx : null;
   const currAns = currAnsIdx !== null ? movies[currAnsIdx] : null;
+
+  // Whether Skip should be shown: not on skipped question revisit, not if feedback showing
+  const showSkipButton = (
+    phase === 'initial' &&
+    cellFeedback.idx === null &&
+    !quizCompleted &&
+    !loading &&
+    realRound < N &&
+    !skippedRounds.includes(realRound)
+  );
+
+  function handleSkip() {
+    // Only allow skip if not already skipped
+    if (!skippedRounds.includes(realRound) && phase === 'initial') {
+      setSkippedRounds(prev => [...prev, realRound]);
+      // If this was the last in the 9, go to review/skipped or finish
+      if (realRound === N - 1) {
+        if (skippedRounds.length + 1 > 0) {
+          setPhase('review-skipped');
+          setRound(0);
+        } else {
+          setQuizCompleted(true);
+        }
+      } else {
+        setRound(r => r + 1);
+      }
+    }
+  }
 
   return (
     <div className="container" style={{ paddingTop: 100, marginBottom: 30, minHeight: 480 }}>
@@ -482,7 +567,9 @@ function MovieBingo({ onBackToDashboard }) {
       <div style={{
         margin: "0 auto 20px", textAlign: "center", fontWeight: 700, fontSize: 21, color: "#fff"
       }}>
-        {`Movie Bingo — Round ${round + 1} of 9`}
+        {phase === 'initial'
+          ? `Movie Bingo — Round ${realRound + 1} of 9`
+          : `Movie Bingo — Revisiting Skipped (${round + 1} of ${skippedRounds.length})`}
       </div>
       <div
         className="description"
@@ -499,6 +586,21 @@ function MovieBingo({ onBackToDashboard }) {
       >
         {currQ ? currQ.question : ""}
       </div>
+
+      {showSkipButton && (
+        <button
+          type="button"
+          className="btn btn-large"
+          style={{
+            margin: "0 auto 18px", display: "block", background: "#ffe05a",
+            color: "#101", minWidth: 124, fontWeight: 600, fontSize: 16
+          }}
+          onClick={handleSkip}
+          disabled={cellFeedback.idx !== null}
+        >
+          Skip Question
+        </button>
+      )}
       {/* GRID */}
       <div style={gridStyle}>
         {movies.map((movie, idx) => {

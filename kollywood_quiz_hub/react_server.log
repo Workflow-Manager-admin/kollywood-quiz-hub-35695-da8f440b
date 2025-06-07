@@ -2,9 +2,9 @@
 > react-kavia@0.1.0 start
 > react-scripts start
 
-(node:252834) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:255703) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:252834) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:255703) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 Starting the development server...
 
 Compiled successfully!
@@ -23,60 +23,10 @@ Compiled with warnings.
 
 [eslint] 
 src/components/MovieBingo.js
-  Line 305:9:  'currCorrectIdx' is assigned a value but never used  no-unused-vars
-
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
-
-WARNING in [eslint] 
-src/components/MovieBingo.js
-  Line 305:9:  'currCorrectIdx' is assigned a value but never used  no-unused-vars
-
-webpack compiled with 1 warning
-Compiling...
-Compiled with warnings.
-
-[eslint] 
-src/components/MovieBingo.js
-  Line 299:9:  'currCorrectIdx' is assigned a value but never used  no-unused-vars
-
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
-
-WARNING in [eslint] 
-src/components/MovieBingo.js
-  Line 299:9:  'currCorrectIdx' is assigned a value but never used  no-unused-vars
-
-webpack compiled with 1 warning
-Compiling...
-Failed to compile.
-
-[eslint] 
-src/components/MovieBingo.js
-  Line 331:41:  'QUESTION_BANK' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-WARNING in [eslint] 
-src/components/MovieBingo.js
-  Line 89:16:   'fetchMoviesDetailedInfo' is defined but never used      no-unused-vars
-  Line 143:10:  'generateUniqueGridQuestions' is defined but never used  no-unused-vars
-  Line 430:9:   'currCorrectIdx' is assigned a value but never used      no-unused-vars
-
-ERROR in [eslint] 
-src/components/MovieBingo.js
-  Line 331:41:  'QUESTION_BANK' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-
-webpack compiled with 1 error and 1 warning
-Compiling...
-Compiled with warnings.
-
-[eslint] 
-src/components/MovieBingo.js
   Line 81:10:   'shuffle' is defined but never used                    no-unused-vars
-  Line 330:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
-  Line 455:9:   'currCorrectIdx' is assigned a value but never used    no-unused-vars
+  Line 307:10:  'skippedRounds' is assigned a value but never used     no-unused-vars
+  Line 308:10:  'phase' is assigned a value but never used             no-unused-vars
+  Line 337:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
 
 Search for the keywords to learn more about each warning.
 To ignore, add // eslint-disable-next-line to the line before.
@@ -84,8 +34,9 @@ To ignore, add // eslint-disable-next-line to the line before.
 WARNING in [eslint] 
 src/components/MovieBingo.js
   Line 81:10:   'shuffle' is defined but never used                    no-unused-vars
-  Line 330:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
-  Line 455:9:   'currCorrectIdx' is assigned a value but never used    no-unused-vars
+  Line 307:10:  'skippedRounds' is assigned a value but never used     no-unused-vars
+  Line 308:10:  'phase' is assigned a value but never used             no-unused-vars
+  Line 337:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
 
 webpack compiled with 1 warning
 Compiling...
@@ -94,8 +45,7 @@ Compiled with warnings.
 [eslint] 
 src/components/MovieBingo.js
   Line 81:10:   'shuffle' is defined but never used                    no-unused-vars
-  Line 330:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
-  Line 454:9:   'currCorrectIdx' is assigned a value but never used    no-unused-vars
+  Line 337:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
 
 Search for the keywords to learn more about each warning.
 To ignore, add // eslint-disable-next-line to the line before.
@@ -103,8 +53,7 @@ To ignore, add // eslint-disable-next-line to the line before.
 WARNING in [eslint] 
 src/components/MovieBingo.js
   Line 81:10:   'shuffle' is defined but never used                    no-unused-vars
-  Line 330:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
-  Line 454:9:   'currCorrectIdx' is assigned a value but never used    no-unused-vars
+  Line 337:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
 
 webpack compiled with 1 warning
 Compiling...
@@ -113,7 +62,7 @@ Compiled with warnings.
 [eslint] 
 src/components/MovieBingo.js
   Line 81:10:   'shuffle' is defined but never used                    no-unused-vars
-  Line 330:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
+  Line 337:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
 
 Search for the keywords to learn more about each warning.
 To ignore, add // eslint-disable-next-line to the line before.
@@ -121,6 +70,23 @@ To ignore, add // eslint-disable-next-line to the line before.
 WARNING in [eslint] 
 src/components/MovieBingo.js
   Line 81:10:   'shuffle' is defined but never used                    no-unused-vars
-  Line 330:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
+  Line 337:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
+
+webpack compiled with 1 warning
+Compiling...
+Compiled with warnings.
+
+[eslint] 
+src/components/MovieBingo.js
+  Line 81:10:   'shuffle' is defined but never used                    no-unused-vars
+  Line 337:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+WARNING in [eslint] 
+src/components/MovieBingo.js
+  Line 81:10:   'shuffle' is defined but never used                    no-unused-vars
+  Line 337:11:  'moviesWithDetail' is assigned a value but never used  no-unused-vars
 
 webpack compiled with 1 warning
