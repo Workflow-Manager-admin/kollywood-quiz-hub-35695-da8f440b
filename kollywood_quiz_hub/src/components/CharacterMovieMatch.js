@@ -363,6 +363,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   const [quizOver, setQuizOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reveal, setReveal] = useState(false);
+  // Track if fallback is in use for in-app messaging
+  const [usingFallback, setUsingFallback] = useState(false);
 
   // PUBLIC_INTERFACE: On mount, fetch movies and prepare the quiz set (10 rounds, each with proper answer & distractors)
   useEffect(() => {
@@ -409,17 +411,39 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         setAllMovies(withPosters); // Save for possible fallback use
 
         // Fallback: If not enough rounds generated with real data, or any round is missing poster(s), use hardcoded fallback.
-        if (roundData.length < QUESTIONS || roundData.some(r => !r.correctMovieObj || !r.correctMovieObj.poster_path || r.choices.some(
-          c => !c.poster_path))) {
+        if (
+          roundData.length < QUESTIONS ||
+          roundData.some(
+            (r) =>
+              !r.correctMovieObj ||
+              !r.correctMovieObj.poster_path ||
+              r.choices.some((c) => !c.poster_path)
+          )
+        ) {
+          // LOG fallback use
+          if (window && window.console) {
+            console.error(
+              "[CharacterMovieMatch] Using FALLBACK_QUESTIONS because TMDB data was insufficient. Reason: Too few good questions or missing poster in choices."
+            );
+          }
           setQuestions(FALLBACK_QUESTIONS);
+          setUsingFallback(true);
         } else {
           setQuestions(roundData);
+          setUsingFallback(false);
         }
         setLoading(false);
       })
-      .catch(() => {
-        // On fetch failure, always use our fallback
+      .catch((err) => {
+        // On fetch failure, always use our fallback and log the error
+        if (window && window.console) {
+          console.error(
+            "[CharacterMovieMatch] TMDB fetch failed, using FALLBACK_QUESTIONS.",
+            err
+          );
+        }
         setQuestions(FALLBACK_QUESTIONS);
+        setUsingFallback(true);
         setLoading(false);
       });
   }, []);
@@ -629,6 +653,23 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       <button className="btn" style={{ marginBottom: 24 }} onClick={onBackToDashboard}>
         ⬅ Back
       </button>
+      {usingFallback && (
+        <div
+          style={{
+            background: "#fffbe2",
+            color: "#bb8900",
+            fontWeight: 600,
+            padding: "6px 16px",
+            borderRadius: 7,
+            marginBottom: 12,
+            boxShadow: "0 2px 11px #fedc8915, 0 0px 1px #fff6b3 inset",
+            fontSize: 15,
+          }}
+          aria-live="polite"
+        >
+          Fallback questions in use — TMDB data was unavailable. Posters and clues are from hardcoded demo set.
+        </div>
+      )}
       <QuizProgress current={step + 1} total={QUESTIONS} />
       <h2 className="title" style={{ fontSize: "1.65rem", marginBottom: 13 }}>
         Character-Movie Match
