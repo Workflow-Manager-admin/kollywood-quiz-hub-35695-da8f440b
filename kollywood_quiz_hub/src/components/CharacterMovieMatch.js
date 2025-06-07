@@ -12,7 +12,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   const QUESTIONS = 10;
   const CHOICES_PER_QUESTION = 4;
 
-  // Fallback/hardcoded questions for demo and offline resilience
+  // Fallback/demo questions for demo and offline
   const FALLBACK_QUESTIONS = [
     {
       clue: "mukundh varadharajan",
@@ -45,7 +45,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         }
       ]
     },
-    // ...remaining fallback entries unchanged for brevity...
     {
       clue: "Anbuchelvan IPS",
       correctMovie: "Kaakha Kaakha",
@@ -327,10 +326,9 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }
   ];
 
-  // TMDB Images base URL (can use .env if available, but hard-coded fallback for robustness)
   const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w185";
 
-  // State
+  // State management
   const [questions, setQuestions] = useState([]);
   const [step, setStep] = useState(0);
   const [dragActive, setDragActive] = useState(false);
@@ -342,7 +340,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   const [reveal, setReveal] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
 
-  // Character/movie pool (for API mode)
   const CHARACTER_MOVIE_PAIRS = [
     { character: "Chitti", movie: "Enthiran" },
     { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
@@ -356,90 +353,93 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Rangasamy", movie: "Sivaji" }
   ];
 
-  // On mount, fetch and build quiz. Fallback for missing posters/data.
+  // Build rounds from API or fallback on mount
   useEffect(() => {
     setLoading(true);
-    fetchKollywoodMovies()
-      .then((movies) => {
-        const withPosters = movies.filter(m => !!m.title && !!m.poster_path && m.poster_path.length > 0);
+    fetchKollywoodMovies().then(movies => {
+      const withPosters = movies.filter(m => !!m.title && !!m.poster_path && m.poster_path.length > 0);
+      const rounds = CHARACTER_MOVIE_PAIRS
+        .map(pair => {
+          const movieObj = withPosters.find(
+            m => m.title.toLowerCase() === pair.movie.toLowerCase()
+          );
+          if (!movieObj) return null;
+          let distractorPool = withPosters.filter(m => m.title !== pair.movie).sort(() => 0.5 - Math.random());
+          let distractors = distractorPool.slice(0, CHOICES_PER_QUESTION - 1);
+          const options = [movieObj, ...distractors].sort(() => 0.5 - Math.random());
+          return {
+            clue: pair.character,
+            correctMovie: pair.movie,
+            correctMovieObj: movieObj,
+            choices: options
+          };
+        })
+        .filter(Boolean)
+        .slice(0, QUESTIONS);
 
-        // Map each character-movie to movieObj (from API), filter out pairs with no valid movie
-        const rounds = CHARACTER_MOVIE_PAIRS
-          .map(pair => {
-            const movieObj = withPosters.find(m => m.title.toLowerCase() === pair.movie.toLowerCase());
-            if (!movieObj) return null;
-            // For choices: exclude the real answer, shuffle, select distractors
-            let distractorPool = withPosters.filter(m => m.title !== pair.movie).sort(() => 0.5 - Math.random());
-            let distractors = distractorPool.slice(0, CHOICES_PER_QUESTION - 1);
-            const options = [movieObj, ...distractors].sort(() => 0.5 - Math.random());
-            return {
-              clue: pair.character,
-              correctMovie: pair.movie,
-              correctMovieObj: movieObj,
-              choices: options
-            };
-          })
-          .filter(Boolean)
-          .slice(0, QUESTIONS);
-
-        // Diagnostics (console logging for debugging poster URLs)
-        if (window?.console) {
-          if (withPosters.length < 15) {
-            console.warn("[CharacterMovieMatch] Low movie poster pool from API:", withPosters.length);
-          }
+      // Poster fallback/logging diagnostics
+      if (window?.console) {
+        if (withPosters.length < 15) {
+          console.warn("[CharacterMovieMatch] Low movie poster pool from API:", withPosters.length);
         }
+      }
 
-        // Must fallback if any round is missing poster_path, or there are not enough good questions
-        const shouldFallback = (
-          rounds.length < QUESTIONS ||
-          rounds.some(r =>
+      // Should fallback if not enough rounds or posterless
+      const shouldFallback = (
+        rounds.length < QUESTIONS ||
+        rounds.some(
+          r =>
             !r.correctMovieObj ||
             !r.correctMovieObj.poster_path ||
             r.choices.some(c => !c.poster_path)
-          )
-        );
-        if (shouldFallback) {
-          if (window?.console) {
-            console.error("[CharacterMovieMatch] Using fallback: insufficient TMDB/quiz data; details:", {
-              gotRounds: rounds.length,
-              sampleRound: rounds[0],
-              withPostersSample: withPosters[0]
-            });
-          }
-          setQuestions(FALLBACK_QUESTIONS);
-          setUsingFallback(true);
-        } else {
-          setQuestions(rounds);
-          setUsingFallback(false);
+        )
+      );
+      if (shouldFallback) {
+        if (window?.console) {
+          console.error("[CharacterMovieMatch] Using fallback: insufficient TMDB/quiz data; details:", {
+            gotRounds: rounds.length,
+            sampleRound: rounds[0],
+            withPostersSample: withPosters[0]
+          });
         }
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (window?.console)
-          console.error("[CharacterMovieMatch] TMDB fetch failed, using fallback.", err);
         setQuestions(FALLBACK_QUESTIONS);
         setUsingFallback(true);
-        setLoading(false);
-      });
+      } else {
+        setQuestions(rounds);
+        setUsingFallback(false);
+      }
+      setLoading(false);
+    }).catch(err => {
+      if (window?.console)
+        console.error("[CharacterMovieMatch] TMDB fetch failed, using fallback.", err);
+      setQuestions(FALLBACK_QUESTIONS);
+      setUsingFallback(true);
+      setLoading(false);
+    });
+  // eslint-disable-next-line
   }, []);
 
-  // Drag and drop logic (drag clue to poster)
+  // Drag/drop handlers
   function handleDragStart() {
     setDraggedClue(questions[step]);
     setDragActive(true);
   }
+
   function handleDragEnd() {
     setDraggedClue(null);
     setDragActive(false);
   }
+
   function allowDrop(event) {
     event.preventDefault();
     setDragActive(true);
   }
+
   function leaveDrop(event) {
     event.preventDefault();
     setDragActive(false);
   }
+
   function handleDropOnPoster(movieObj, idx, event) {
     event.preventDefault();
     if (answeredIdx !== null) return;
@@ -460,14 +460,13 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     ]);
     setAnsweredIdx(null);
     setDragActive(false);
-
     setTimeout(() => {
       if (step + 1 === QUESTIONS) setQuizOver(true);
       else setStep(step + 1);
     }, 450);
   }
 
-  // Reveal/give up behavior
+  // Reveal/give up
   function handleReveal() {
     setReveal(true);
     setUserAnswers(prev => [
@@ -487,7 +486,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }, 1800);
   }
 
-  // --- UI Render Logic ---
+  // --- Render Logic ---
 
   if (loading) {
     return (
@@ -496,6 +495,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       </div>
     );
   }
+
   if (quizOver) {
     return (
       <QuizResult
@@ -507,7 +507,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       />
     );
   }
-  // Defensive fallback: if no valid question (should never happen)
+
+  // Defensive/fallback for missing question
   if (!questions[step]) {
     const fb = FALLBACK_QUESTIONS[0];
     return (
@@ -537,7 +538,9 @@ function CharacterMovieMatch({ onBackToDashboard }) {
               opacity: 1,
               cursor: "grab"
             }}
-          >{fb.clue}</div>
+          >
+            {fb.clue}
+          </div>
           <div
             style={{
               display: "flex",
@@ -546,8 +549,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
               justifyContent: "center",
               flexWrap: "wrap"
             }}>
-            {fb.choices && fb.choices.length > 0 && (
-              <>
+            {Array.isArray(fb.choices) && fb.choices.length > 0 ? (
+              <React.Fragment>
                 {fb.choices.map((movieObj, idx) => (
                   <div
                     key={movieObj.id || idx}
@@ -565,7 +568,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                       color: "#111",
                       fontWeight: 500,
                       margin: 6,
-                      boxShadow: "0 3px 10px #ecf2fb"
+                      boxShadow: "0 3px 10px #ecf2fb",
+                      position: "relative"
                     }}
                     tabIndex={0}
                     aria-label={`Demo poster for ${movieObj.title}`}
@@ -589,7 +593,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                         onError={e => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.style.display = "none";
-                          // fallback
                           const fallbackDiv = document.createElement("div");
                           fallbackDiv.textContent = "Poster Unavailable";
                           fallbackDiv.style.width = "110px";
@@ -630,7 +633,9 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                     )}
                   </div>
                 ))}
-              </>
+              </React.Fragment>
+            ) : (
+              <div>No poster choices available.</div>
             )}
           </div>
         </div>
@@ -638,7 +643,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     );
   }
 
-  // Normal round UI
+  // --- Normal round UI ---
   const question = questions[step];
 
   return (
@@ -672,7 +677,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         {`(1 correct poster, ${CHOICES_PER_QUESTION - 1} decoy posters per round)`}
       </div>
       <div style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
+        display: "flex", flexDirection: "column", alignItems: "center"
       }}>
         {/* DRAGGABLE CLUE */}
         <div
@@ -708,19 +713,21 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             pointerEvents: reveal ? "none" : "auto"
           }}
         >
-          {question.choices && question.choices.length > 0 && (
-            <>
+          {Array.isArray(question.choices) && question.choices.length > 0 ? (
+            <React.Fragment>
               {question.choices.map((movieObj, idx) => {
-                // Log the image/poster info always for diagnostics
+                // Always log poster info for diagnostics
                 if (window?.console) {
+                  // Poster URL logging per requirement
                   console.log(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}]`, {
                     title: movieObj.title,
                     poster_path: movieObj.poster_path,
                     TMDB_IMAGE_BASE,
                     url: movieObj.poster_path ? `${TMDB_IMAGE_BASE}${movieObj.poster_path}` : null,
                   });
-                  if (!movieObj.poster_path)
+                  if (!movieObj.poster_path) {
                     console.warn(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}] poster_path missing`, movieObj);
+                  }
                 }
                 return (
                   <div
@@ -830,7 +837,9 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                   </div>
                 );
               })}
-            </>
+            </React.Fragment>
+          ) : (
+            <div>No poster choices available.</div>
           )}
         </div>
         <button
