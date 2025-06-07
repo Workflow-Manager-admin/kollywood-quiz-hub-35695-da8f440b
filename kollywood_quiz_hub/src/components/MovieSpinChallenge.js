@@ -227,6 +227,8 @@ function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
     // eslint-disable-next-line
   }, [spinning]);
   // Fade/scale for current
+  // Ensure high text contrast in wheels:
+  // Label = blue shade (kept), value = pure white with strong shadow if needed
   return (
     <div
       style={{
@@ -244,6 +246,7 @@ function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
           fontWeight: 600,
           color: "#15b6cc",
           marginBottom: 8,
+          textShadow: "0 2px 8px #fff, 0 1px 0px #013", // subtle light halo
         }}
       >
         {label}
@@ -253,17 +256,21 @@ function SpinnerWheel({ items, spinning, onEnd, selectedIdx, label }) {
           width: 105,
           height: 70,
           borderRadius: 22,
-          background: "#f6fafc",
+          background: "#0C2E40",
           border: "2.5px solid var(--base-light)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 19,
-          boxShadow: "0 5px 30px #96e6fe15",
+          fontSize: 22,
+          fontWeight: 700,
+          boxShadow: "0 5px 30px #031d2827",
           textAlign: "center",
           marginBottom: 4,
           userSelect: "none",
+          color: "#fff",
+          textShadow: "0 1px 7px #000, 0 1px 22px #004f847c", // strong shadow for white text on blue bg
+          letterSpacing: ".02em",
         }}
       >
         {spinning && items.length > 0
@@ -481,11 +488,23 @@ function MovieSpinChallenge({ onBackToDashboard }) {
       <button className="btn" style={{ marginBottom: 24 }} onClick={onBackToDashboard}>
         ⬅ Back
       </button>
-      <h2 className="title" style={{ fontSize: "2.1rem", marginBottom: 13 }}>
+      <h2 className="title" style={{
+        fontSize: "2.1rem",
+        marginBottom: 13,
+        color: "#fff",
+        textShadow: "0 3px 18px #020c22",
+      }}>
         Movie Spin Challenge
       </h2>
-      <div className="description" style={{ marginBottom: 17 }}>
-        Spin three wheels to get a Kollywood <b>Actor</b>, <b>Genre</b>, and <b>Location</b>. Can you create or guess a Tamil movie that matches <b>all three</b>? We'll check using TMDB data for only new, unused Kollywood movies!
+      <div className="description" style={{
+        marginBottom: 17,
+        color: "#ffe43c",
+        fontWeight: 600,
+        textShadow: "0 1px 8px #222, 0 1px 12px #6464649c",
+      }}>
+        Spin three wheels to get a Kollywood <b>Actor</b>, <b>Genre</b>, and <b>Location</b>.
+        Can you create or guess a Tamil movie that matches <b>all three</b>?<br />
+        <span style={{ color: "#fff", fontWeight: 400 }}>We'll check using TMDB data for only new, unused Kollywood movies!</span>
       </div>
 
       {/* Main spinning-wheel row */}
@@ -526,12 +545,15 @@ function MovieSpinChallenge({ onBackToDashboard }) {
           className="btn btn-large"
           style={{
             background: spinning
-              ? "#baf2fa"
+              ? "#fec300"
               : "var(--base-light)",
-            color: "#111",
-            fontWeight: 600,
-            fontSize: 18,
+            color: spinning ? "#222" : "#fff",
+            fontWeight: 700,
+            fontSize: 19,
+            textShadow: "0 2px 18px #222, 0 1.5px 8px #fff7",
             pointerEvents: spinning ? "none" : "auto",
+            border: spinning ? "2.5px solid #ffa800" : "",
+            letterSpacing: ".03em"
           }}
           onClick={handleStartSpin}
           disabled={spinning}
@@ -547,34 +569,47 @@ function MovieSpinChallenge({ onBackToDashboard }) {
       {finalCombo && (
         <div
           style={{
-            background: "#fdfaf2",
-            color: "#312368",
+            background: "#232323",
+            color: "#fff",
             borderRadius: 12,
             padding: "23px 8px 9px 8px",
             textAlign: "center",
-            fontWeight: 600,
+            fontWeight: 700,
             margin: "7px auto 0",
             fontSize: 19,
             maxWidth: 420,
             marginBottom: 18,
-            boxShadow: "0 0 19px #e7e7fb33",
+            boxShadow: "0 0 19px #28282a77",
+            textShadow: "0 1px 11px #000, 0 2px 22px #2227",
+            border: "2.2px solid var(--base-light)",
           }}
         >
           <span>
-            Your Movie Spin:{" "}
-            <span style={{ color: "#24bec9" }}>
-              <b>{finalCombo.actor}</b>
+            <span style={{ color: "#ffe442", fontWeight: 800 }}>Your Movie Spin:</span>{" "}
+            <span style={{
+              color: "#24bec9", background: "#14232e", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
+              fontWeight: 700, textShadow: "0 2px 10px #013, 0 1px 18px #1605"
+            }}>
+              {finalCombo.actor}
             </span>
             {" | "}
-            <span style={{ color: "#ec6400" }}>
-              <b>{finalCombo.genre}</b>
+            <span style={{
+              color: "#ffd700", background: "#524000", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
+              fontWeight: 700, textShadow: "0 2px 13px #b36d05, 0 1px 18px #0008"
+            }}>
+              {finalCombo.genre}
             </span>
             {" | "}
-            <span style={{ color: "#a10cc5" }}>
-              <b>{finalCombo.location}</b>
+            <span style={{
+              color: "#fff", background: "#5f24ad", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
+              fontWeight: 700, textShadow: "0 2px 11px #29014f, 0 1px 17px #2e0145"
+            }}>
+              {finalCombo.location}
             </span>
             <br />
-            Enter a Kollywood movie that matches <b>all three</b>, or try to invent one.&nbsp;
+            <span style={{ color: "#ffe43c", textShadow: "0 0 8px #000d" }}>
+              Enter a Kollywood movie that matches <b>all three</b>, or try to invent one.&nbsp;
+            </span>
           </span>
         </div>
       )}
@@ -594,21 +629,32 @@ function MovieSpinChallenge({ onBackToDashboard }) {
               maxWidth: 350,
               fontSize: "1.13rem",
               borderRadius: 4,
-              border: "1.7px solid var(--border-color)",
+              border: "2.5px solid var(--base-light)",
               marginBottom: 8,
               marginRight: 9,
-              background: spinning ? "#edeff2" : "#fff",
-              color: "#333",
+              background: "#13152d",
+              color: "#fff",
+              fontWeight: 600,
+              textShadow: "0 1px 8px #020c22",
+              letterSpacing: ".01em",
+              outline: "none",
+              boxShadow: "0 0 9px #15175e55",
             }}
           />
           <button
             type="submit"
             className="btn btn-large"
             style={{
-              color: "#111",
-              background: "#eaffdc",
-              fontWeight: 600,
+              background: "#ffe62c",
+              color: "#181207",
+              fontWeight: 800,
+              letterSpacing: ".04em",
+              border: "2.2px solid #e9a500",
+              textShadow: "0 1px 6px #ffe15288, 0 4px 16px #fff15b33",
               pointerEvents: spinning ? "none" : "auto",
+              boxShadow: "0 2px 8px #fffae7, 0 1.5px 10px #ffe93c44",
+              marginLeft: 4,
+              marginTop: -3,
             }}
             disabled={spinning || !userInput}
           >
@@ -620,18 +666,35 @@ function MovieSpinChallenge({ onBackToDashboard }) {
       {showResult && (
         <div style={{
           marginTop: 24,
-          color: feedback.startsWith("✅") ? "#249d24" : "#d51218",
-          fontWeight: 700,
-          fontSize: 16,
-          minHeight: 20,
-          textAlign: "center"
+          fontWeight: 800,
+          fontSize: 17,
+          minHeight: 22,
+          textAlign: "center",
+          color: feedback.startsWith("✅") ? "#fff" : "#fff",
+          background: feedback.startsWith("✅") ? "#1f5f2e" : "#b31322",
+          borderRadius: 10,
+          boxShadow: "0 2px 14px #1d182830",
+          padding: "16px 6px 12px 6px",
+          textShadow: feedback.startsWith("✅")
+            ? "0 1.5px 10px #13e87a, 0 2px 18px #000c"
+            : "0 2px 10px #a80321, 0 6px 12px #fff3",
+          letterSpacing: ".018em"
         }}>
           {feedback}
           {matchingMovie && (
-            <div style={{ marginTop: 16, color: "#2b5451", fontSize: 17 }}>
+            <div style={{
+              marginTop: 16,
+              color: "#ffe63c",
+              fontSize: 19,
+              textShadow: "0 1px 11px #b08d08, 0 2px 15px #262101",
+              fontWeight: 700,
+            }}>
               <b>✓ Example match:</b>
               <br />
-              <span style={{ color: "#197da4", fontWeight: 600 }}>
+              <span style={{
+                color: "#fff", fontWeight: 900,
+                textShadow: "0 1px 11px #37b5ec,0 2px 9px #3aaad8a7"
+              }}>
                 {matchingMovie.title}
               </span>
               {matchingMovie.fullDetails && matchingMovie.fullDetails.poster_path && (
@@ -644,17 +707,37 @@ function MovieSpinChallenge({ onBackToDashboard }) {
                     width: 68,
                     height: 98,
                     borderRadius: 6,
-                    border: "2px solid #e3f3fa",
+                    border: "2.5px solid #b7ecf5",
                   }}
                 />
               )}
             </div>
           )}
           <div style={{ marginTop: 18 }}>
-            <button className="btn" onClick={resetGame} style={{ marginRight: 10 }}>
+            <button
+              className="btn"
+              onClick={resetGame}
+              style={{
+                marginRight: 10,
+                background: "#1871ad",
+                color: "#fff",
+                fontWeight: 700,
+                border: "2px solid #5eb3f1",
+                textShadow: "0 2px 12px #0063b4, 0 1px 18px #c8eaff55",
+              }}>
               Play Again
             </button>
-            <button className="btn" onClick={onBackToDashboard}>
+            <button
+              className="btn"
+              onClick={onBackToDashboard}
+              style={{
+                background: "#272b2f",
+                color: "#ffe800",
+                fontWeight: 700,
+                marginLeft: 6,
+                border: "2px solid #b8ad38",
+                textShadow: "0 1px 10px #17180b, 0 0px 18px #fff13d44"
+              }}>
               Back to Dashboard
             </button>
           </div>
@@ -662,9 +745,10 @@ function MovieSpinChallenge({ onBackToDashboard }) {
       )}
       <div style={{
         marginTop: 38,
-        color: "#adadad",
-        fontSize: 12,
-        textAlign: "center"
+        color: "#ffe800",
+        fontSize: 13,
+        textAlign: "center",
+        textShadow: "0 1px 7px #171918, 0 3px 13px #232222"
       }}>
         Data &copy; TMDB. Only unused Kollywood movies are included in each play—once you match a movie, it vanishes from future spins!
       </div>
