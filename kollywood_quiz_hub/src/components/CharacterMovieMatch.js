@@ -85,22 +85,25 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           }
         }
 
-        // For each question, build the option set: correct movie + random distractors
+        // For each question, build the option set: correct movie + random distractors (never omitting the correct one!)
         const buildChoicesForQuestions = () => {
-          // Avoid repeats (do not use correct movie as a distractor in the same question)
+          /**
+           * Always include the correct movie/title among the options.
+           * Fill the rest with movies (that are not the correct answer),
+           * and ensure movie title and poster are both available for all options.
+           */
           const allPool = allMovies.filter(m =>
-            m.poster_path && m.title // Make sure some poster and title exist
+            m.poster_path && m.title // Only movies with poster & title
           );
-          // fallback: if not enough with posters, allow any
+
           function getDistractors(correctMovieTitle) {
-            // Pick random movies (not correct answer) from allPool
+            // Select plausible distractors that are not the correct movie
             const distractors = [];
-            const shuffled = allPool
-              .filter(m => m.title !== correctMovieTitle)
-              .sort(() => 0.5 - Math.random());
+            const candidates = allPool.filter(m => m.title !== correctMovieTitle);
+            // Shuffle candidates
+            const shuffled = candidates.sort(() => 0.5 - Math.random());
             for (let i = 0; i < shuffled.length && distractors.length < CHOICES_PER_QUESTION - 1; ++i) {
-              // Avoid blank/duplicate posters in same set
-              if (!distractors.find(d => d.title === shuffled[i].title)) {
+              if (!distractors.find(d => d.movie === shuffled[i].title)) {
                 distractors.push({
                   movie: shuffled[i].title,
                   movieObj: shuffled[i],
@@ -110,33 +113,62 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             return distractors;
           }
 
+          // Build questions set, guarantee correct answer always present, and choices are unique
           return resultQuestions.map((qInfo) => {
+            const correctMovie = qInfo.movie;
             const correctOption = {
-              movie: qInfo.movie,
+              movie: correctMovie,
               movieObj: qInfo.movieObj,
             };
-            // Select distractors
-            let distractors = getDistractors(qInfo.movie);
-            // If not enough distractors, fallback to others (even without posters)
+
+            let distractors = getDistractors(correctMovie);
+
+            // If not enough (due to poster/title filtering), fall back to include movies without posters
             if (distractors.length < CHOICES_PER_QUESTION - 1) {
-              const others = allMovies
-                .filter(m => m.title !== qInfo.movie)
+              const backup = allMovies
+                .filter(m => m.title !== correctMovie)
                 .filter(m => !distractors.find(d => d.movie === m.title))
                 .sort(() => 0.5 - Math.random());
-              for (let i = 0; i < others.length && distractors.length < CHOICES_PER_QUESTION - 1; ++i) {
+              for (let i = 0; i < backup.length && distractors.length < CHOICES_PER_QUESTION - 1; ++i) {
                 distractors.push({
-                  movie: others[i].title,
-                  movieObj: others[i],
+                  movie: backup[i].title,
+                  movieObj: backup[i],
                 });
               }
             }
-            // Always have correct + distractors
-            const choices = [correctOption, ...distractors];
-            // Shuffle for display
-            const shuffledOpts = choices.sort(() => 0.5 - Math.random()).slice(0, CHOICES_PER_QUESTION);
+
+            // Always insert correct answer, then add distractors, then shuffle choices
+            let choices = [correctOption, ...distractors.slice(0, CHOICES_PER_QUESTION - 1)];
+            // Defensive: remove dups by movie title
+            const uniqueChoices = [];
+            const seen = new Set();
+            for (let c of choices) {
+              if (!seen.has(c.movie)) {
+                uniqueChoices.push(c);
+                seen.add(c.movie);
+              }
+            }
+            // If still too few, fill with any remaining randoms
+            while (uniqueChoices.length < CHOICES_PER_QUESTION) {
+              const filler = allMovies.find(
+                m => m.title !== correctMovie && !uniqueChoices.find(d => d.movie === m.title)
+              );
+              if (!filler) break;
+              uniqueChoices.push({ movie: filler.title, movieObj: filler });
+            }
+            // Shuffle choice display order
+            const shuffledOpts = uniqueChoices
+              .slice(0, CHOICES_PER_QUESTION)
+              .sort(() => 0.5 - Math.random());
+            // Defensive: ensure correct answer is absolutely present
+            if (!shuffledOpts.find(opt => opt.movie === correctMovie)) {
+              // Replace first with the correct one (this should never occur; fallback for safety)
+              shuffledOpts[0] = correctOption;
+            }
+
             return {
               character: qInfo.character,
-              correctMovie: qInfo.movie, // title string
+              correctMovie: correctMovie,
               correctMovieObj: qInfo.movieObj,
               choices: shuffledOpts,
             };
