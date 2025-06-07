@@ -9,6 +9,7 @@ import CharacterMovieMatch from "./components/CharacterMovieMatch";
 import MysteryMovieDetective from "./components/MysteryMovieDetective";
 import MovieBingo from "./components/MovieBingo";
 import MovieSpinChallenge from "./components/MovieSpinChallenge";
+import MoviePropsInventory from "./components/MoviePropsInventory";
 // import EmojiMovieQuiz from "./components/EmojiMovieQuiz";  // Removed (replaced)
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
     mysteryDetective: <MysteryMovieDetective onBackToDashboard={handleBackToDashboard} />,
     movieBingo: <MovieBingo onBackToDashboard={handleBackToDashboard} />,
     movieSpin: <MovieSpinChallenge onBackToDashboard={handleBackToDashboard} />,
+    movieProps: <MoviePropsInventory onBackToDashboard={handleBackToDashboard} />,
     // "emojiQuiz" gameKey is deprecated
   };
 
