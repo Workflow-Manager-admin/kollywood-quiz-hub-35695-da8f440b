@@ -200,37 +200,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }
   }
 
-  // --- Poster overrides for Meiyazhagan, Cuckoo, and Muthu only ---
-  // Meiyazhagan (1994) - ID: 270760
-  const MEIYAZHAGAN_OVERRIDE = {
-    title: "Meiyazhagan",
-    id: 270760,
-    poster_path: "/oEqStVMKbOmw3XoaTpK17jS98o4.jpg",
-    original_language: "ta",
-  };
-  // Cuckoo (2014) - ID: 257388
-  const CUCKOO_OVERRIDE = {
-    title: "Cuckoo",
-    id: 257388,
-    poster_path: "/g7wn2jsdA3zIu1WIn7gkNwHeCWH.jpg",
-    original_language: "ta",
-  };
-  // Muthu (Rajinikanth, 1995) - ID: 109007
-  const MUTHU_OVERRIDE = {
-    title: "Muthu",
-    id: 109007,
-    poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg",
-    original_language: "ta",
-  };
-
-  // Helper: get movie object with poster_path override for specific movies (using correct TMDB ID/poster)
-  function getMovieOverrideObj(title) {
-    if (title === "Meiyazhagan") return { ...MEIYAZHAGAN_OVERRIDE };
-    if (title === "Cuckoo") return { ...CUCKOO_OVERRIDE };
-    if (title === "Muthu") return { ...MUTHU_OVERRIDE };
-    return null;
-  }
-
   // MAIN QUIZ ROUND BUILDER
   useEffect(() => {
     let cancelled = false;
@@ -240,26 +209,15 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       const rounds = [];
       for (let idx = 0; idx < CHARACTER_MOVIE_PAIRS.length; ++idx) {
         const pair = CHARACTER_MOVIE_PAIRS[idx];
-        let correctMovieObj = getMovieOverrideObj(pair.movie);
-        if (!correctMovieObj) {
-          correctMovieObj = await fetchTMDBMovieByTitle(pair.movie);
-        }
-        // Enforce overrides for Meiyazhagan, Cuckoo, and Muthu: always use correct TMDB data
-        if (pair.movie === "Meiyazhagan") {
-          correctMovieObj = { ...MEIYAZHAGAN_OVERRIDE };
-        }
-        if (pair.movie === "Cuckoo") {
-          correctMovieObj = { ...CUCKOO_OVERRIDE };
-        }
-        if (pair.movie === "Muthu") {
-          correctMovieObj = { ...MUTHU_OVERRIDE };
-        }
+        // Always fetch from TMDB by title - NO manual override for Meiyazhagan, Muthu, or Cuckoo.
+        let correctMovieObj = await fetchTMDBMovieByTitle(pair.movie);
         let correctPoster = correctMovieObj && correctMovieObj.poster_path;
+
         let distractorsArr = await getDistractorPosters(
           pair.movie,
           CHOICES_PER_QUESTION - 1
         );
-        // Ensure we never include Meiyazhagan, Cuckoo, or Muthu as a distractor (avoid poster collision)
+        // Ensure we never include Meiyazhagan, Cuckoo, or Muthu as a distractor (avoid self-collision)
         distractorsArr = distractorsArr.filter(
           d => (
             d.title &&
@@ -276,34 +234,28 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg", // Mouna Ragam as generic decoy
           });
         }
-        // For options, correct (with forced override if necessary) + filtered distractors
+        // For options, correct (TMDB result, robust) + filtered distractors
         const choicesArr = [
           {
             ...correctMovieObj,
-            title: correctMovieObj.title || pair.movie,
-            poster_path: correctMovieObj.poster_path || null,
-            id: typeof correctMovieObj.id !== "undefined" ? correctMovieObj.id : `tmdb-missing-${idx}`,
+            title: (correctMovieObj && correctMovieObj.title) || pair.movie,
+            poster_path: correctPoster || null,
+            id: typeof correctMovieObj?.id !== "undefined" ? correctMovieObj.id : `tmdb-missing-${idx}`,
           },
           ...distractorsArr.slice(0, CHOICES_PER_QUESTION - 1),
         ].sort(() => 0.5 - Math.random());
 
-        // If any options are missing poster (or round is broken), fallback
+        // If any of the options is missing poster (or round is incomplete), fallback
         const fallbackNeeded =
           !correctPoster ||
           choicesArr.length < CHOICES_PER_QUESTION ||
           choicesArr.some(c => !c.poster_path);
 
         if (fallbackNeeded) {
-          // Only fallback if not VIP/Gentleman/Muthu round, as those will always have posters above
-          if (
-            !["VIP", "Gentleman", "Muthu"].includes(pair.movie)
-          ) {
-            setQuestions(FALLBACK_QUESTIONS);
-            setUsingFallback(true);
-            setLoading(false);
-            return;
-          }
-          // For VIP, Gentleman, Muthu: never fallback, always use enforced override above (guaranteed poster)
+          setQuestions(FALLBACK_QUESTIONS);
+          setUsingFallback(true);
+          setLoading(false);
+          return;
         }
         rounds.push({
           clue: pair.character,
@@ -585,9 +537,9 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                     tabIndex={0}
                     aria-label={`Demo poster for ${movieObj.title}`}
                   >
-                    {movieObj.poster_path ? (
+                    {movieObj.poster_path && typeof movieObj.poster_path === "string" ? (
                       <img
-                        src={`${TMDB_IMAGE_BASE}${movieObj.poster_path}`}
+                        src={`https://image.tmdb.org/t/p/w185${movieObj.poster_path}`}
                         alt={movieObj.title ? `Poster for ${movieObj.title}` : "Movie Poster"}
                         style={{
                           width: "110px",
@@ -602,6 +554,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                         }}
                         loading="lazy"
                         onError={e => {
+                          // Hide image and show fallback message
                           e.currentTarget.onerror = null;
                           e.currentTarget.style.display = "none";
                           const fallbackDiv = document.createElement("div");
@@ -627,7 +580,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                         display: "flex", alignItems: "center", justifyContent: "center",
                         color: "#678", fontSize: 12, fontWeight: 500
                       }}>
-                        No Poster
+                        Poster Unavailable
                       </div>
                     )}
                     <div style={{
@@ -787,9 +740,9 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                     tabIndex={0}
                     aria-label={`Drop character here for ${movieObj.title}`}
                   >
-                    {movieObj.poster_path ? (
+                    {movieObj.poster_path && typeof movieObj.poster_path === "string" ? (
                       <img
-                        src={`${TMDB_IMAGE_BASE}${movieObj.poster_path}`}
+                        src={`https://image.tmdb.org/t/p/w185${movieObj.poster_path}`}
                         alt={movieObj.title ? `Poster for ${movieObj.title}` : "Movie Poster"}
                         style={{
                           width: "110px",
@@ -804,6 +757,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                         }}
                         loading="lazy"
                         onError={e => {
+                          // Hide image and show fallback message
                           e.currentTarget.onerror = null;
                           e.currentTarget.style.display = "none";
                           const fallbackDiv = document.createElement("div");
@@ -829,7 +783,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                         display: "flex", alignItems: "center", justifyContent: "center",
                         color: "#678", fontSize: 12, fontWeight: 500
                       }}>
-                        No Poster
+                        Poster Unavailable
                       </div>
                     )}
                     <div style={{
