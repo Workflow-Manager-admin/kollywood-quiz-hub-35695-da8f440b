@@ -37,12 +37,7 @@ function Dashboard({ username, onGameSelect }) {
       desc: "Spin the actor, genre, and location wheels. Guess a movie that matches all three!",
       icon: "🎰"
     },
-    {
-      key: "movieProps",
-      title: "Movie Props Inventory",
-      desc: "Guess the Kollywood movie from a box of iconic props!",
-      icon: "🎁"
-    }
+    // Movie Props Inventory removed
   ];
 
   return (
