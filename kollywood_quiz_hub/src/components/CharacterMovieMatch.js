@@ -213,15 +213,24 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                   <img
                     src={`https://image.tmdb.org/t/p/w185${opt.movieObj.poster_path}`}
                     alt={opt.movie}
-                    width={110}
-                    height={160}
                     style={{
-                      borderRadius: 5,
+                      width: "100%",
+                      maxWidth: 120,
+                      height: "auto",
+                      aspectRatio: "110/160",
+                      borderRadius: "6px",
                       objectFit: "cover",
                       marginTop: 10,
+                      marginBottom: 0,
                       background: "#eaf1ff",
-                      border: selectedMovie === opt.movie ? "2px solid #4796e6" : "2px solid #e0eefc"
+                      border: selectedMovie === opt.movie
+                        ? "2px solid #4796e6"
+                        : "2px solid #e0eefc",
+                      boxShadow: selectedMovie === opt.movie
+                        ? "0 2px 12px #b9e5ff"
+                        : "0 1px 4px #e2f2fd"
                     }}
+                    loading="lazy"
                   />
                 ) : (
                   <div style={{
@@ -229,8 +238,16 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                     height: 160,
                     background: "#ccd7e9",
                     borderRadius: 5,
-                    marginTop: 10
-                  }} />
+                    marginTop: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#789",
+                    fontSize: 14,
+                    fontWeight: 500
+                  }}>
+                    No Poster
+                  </div>
                 )}
                 <div style={{
                   marginTop: 10,
