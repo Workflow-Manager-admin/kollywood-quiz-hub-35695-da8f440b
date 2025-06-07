@@ -2,9 +2,9 @@
 > react-kavia@0.1.0 start
 > react-scripts start
 
-(node:243862) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:244661) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:243862) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:244661) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 Starting the development server...
 
 Compiled successfully!
@@ -23,64 +23,27 @@ Compiled with warnings.
 
 [eslint] 
 src/components/MovieBingo.js
-  Line 2:10:    'fetchKollywoodMovies' is defined but never used                                                                          no-unused-vars
-  Line 37:24:   Unnecessary escape character: \:                                                                                          no-useless-escape
-  Line 37:26:   Unnecessary escape character: \'                                                                                          no-useless-escape
-  Line 37:28:   Unnecessary escape character: \.                                                                                          no-useless-escape
-  Line 43:22:   Unnecessary escape character: \:                                                                                          no-useless-escape
-  Line 43:24:   Unnecessary escape character: \'                                                                                          no-useless-escape
-  Line 43:26:   Unnecessary escape character: \.                                                                                          no-useless-escape
-  Line 67:10:   'usedIds' is assigned a value but never used                                                                              no-unused-vars
-  Line 122:22:  'getMovieDetails' is defined but never used                                                                               no-unused-vars
-  Line 273:6:   React Hook useEffect has a missing dependency: 'DANCE_SEQUENCE_MOVIES'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  Line 20:54:   Unnecessary escape character: \:                 no-useless-escape
+  Line 20:56:   Unnecessary escape character: \'                 no-useless-escape
+  Line 20:58:   Unnecessary escape character: \"                 no-useless-escape
+  Line 20:61:   Unnecessary escape character: \.                 no-useless-escape
+  Line 273:9:   'order' is assigned a value but never used       no-unused-vars
+  Line 305:9:   'correctIdx' is assigned a value but never used  no-unused-vars
+  Line 372:9:   'nCols' is assigned a value but never used       no-unused-vars
+  Line 426:15:  'isActive' is assigned a value but never used    no-unused-vars
 
 Search for the keywords to learn more about each warning.
 To ignore, add // eslint-disable-next-line to the line before.
 
 WARNING in [eslint] 
 src/components/MovieBingo.js
-  Line 2:10:    'fetchKollywoodMovies' is defined but never used                                                                          no-unused-vars
-  Line 37:24:   Unnecessary escape character: \:                                                                                          no-useless-escape
-  Line 37:26:   Unnecessary escape character: \'                                                                                          no-useless-escape
-  Line 37:28:   Unnecessary escape character: \.                                                                                          no-useless-escape
-  Line 43:22:   Unnecessary escape character: \:                                                                                          no-useless-escape
-  Line 43:24:   Unnecessary escape character: \'                                                                                          no-useless-escape
-  Line 43:26:   Unnecessary escape character: \.                                                                                          no-useless-escape
-  Line 67:10:   'usedIds' is assigned a value but never used                                                                              no-unused-vars
-  Line 122:22:  'getMovieDetails' is defined but never used                                                                               no-unused-vars
-  Line 273:6:   React Hook useEffect has a missing dependency: 'DANCE_SEQUENCE_MOVIES'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
-
-webpack compiled with 1 warning
-Compiling...
-Compiled with warnings.
-
-[eslint] 
-src/components/MovieBingo.js
-  Line 2:10:   'fetchKollywoodMovies' is defined but never used            no-unused-vars
-  Line 2:32:   'tmdbGet' is defined but never used                         no-unused-vars
-  Line 37:24:  Unnecessary escape character: \:                            no-useless-escape
-  Line 37:26:  Unnecessary escape character: \'                            no-useless-escape
-  Line 37:28:  Unnecessary escape character: \.                            no-useless-escape
-  Line 43:22:  Unnecessary escape character: \:                            no-useless-escape
-  Line 43:24:  Unnecessary escape character: \'                            no-useless-escape
-  Line 43:26:  Unnecessary escape character: \.                            no-useless-escape
-  Line 67:10:  'usedIds' is assigned a value but never used                no-unused-vars
-  Line 72:9:   'DANCE_SEQUENCE_MOVIES' is assigned a value but never used  no-unused-vars
-
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
-
-WARNING in [eslint] 
-src/components/MovieBingo.js
-  Line 2:10:   'fetchKollywoodMovies' is defined but never used            no-unused-vars
-  Line 2:32:   'tmdbGet' is defined but never used                         no-unused-vars
-  Line 37:24:  Unnecessary escape character: \:                            no-useless-escape
-  Line 37:26:  Unnecessary escape character: \'                            no-useless-escape
-  Line 37:28:  Unnecessary escape character: \.                            no-useless-escape
-  Line 43:22:  Unnecessary escape character: \:                            no-useless-escape
-  Line 43:24:  Unnecessary escape character: \'                            no-useless-escape
-  Line 43:26:  Unnecessary escape character: \.                            no-useless-escape
-  Line 67:10:  'usedIds' is assigned a value but never used                no-unused-vars
-  Line 72:9:   'DANCE_SEQUENCE_MOVIES' is assigned a value but never used  no-unused-vars
+  Line 20:54:   Unnecessary escape character: \:                 no-useless-escape
+  Line 20:56:   Unnecessary escape character: \'                 no-useless-escape
+  Line 20:58:   Unnecessary escape character: \"                 no-useless-escape
+  Line 20:61:   Unnecessary escape character: \.                 no-useless-escape
+  Line 273:9:   'order' is assigned a value but never used       no-unused-vars
+  Line 305:9:   'correctIdx' is assigned a value but never used  no-unused-vars
+  Line 372:9:   'nCols' is assigned a value but never used       no-unused-vars
+  Line 426:15:  'isActive' is assigned a value but never used    no-unused-vars
 
 webpack compiled with 1 warning
