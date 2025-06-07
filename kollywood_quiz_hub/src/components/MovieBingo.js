@@ -120,7 +120,10 @@ function MovieBingo({ onBackToDashboard }) {
       let idUsedSet = new Set();
 
       // Cell [0]: 'Time Travel'
-      // -- There are very few actual Kollywood time travel movies, but key ones are 'Indru Netru Naalai', '24', 'Maanaadu', others have "time" in overview
+      // TMDB does not support Kollywood-specific time travel keyword directly!
+      // -- TRUE match: key movies ('Indru Netru Naalai', '24', 'Maanaadu'), or 'time travel', etc. as keyword in title or overview.
+      // -- Fallback: fantasy genre (TMDB: 14) if not enough.
+      // If unable to fill: EXPLICIT COMMENT: no robust TMDB property exists!
       const timeTravelKeywords = ["time travel", "time-travel", "future", "past", "machine", "Indru Netru Naalai", "24", "Maanaadu"];
       let timeTravel = allMovies.filter(
         m => (timeTravelKeywords.some(kw => 
@@ -130,8 +133,11 @@ function MovieBingo({ onBackToDashboard }) {
             (m.overview && /\btime\b/.test(m.overview.toLowerCase()))
       );
       if (timeTravel.length < 2) {
-        // fallback: grab any with 'fantasy' genre as closest match
+        // --- Fallback: fantasy genre (id: 14) ---
+        // No exact mapping: so we explain this in the code!
+        // See: https://developer.themoviedb.org/reference/genre-movie-list
         timeTravel = allMovies.filter(m => (m.genre_ids || []).includes(14) || (m.overview && m.overview.toLowerCase().includes("fantasy")));
+        // --- If even this is missing, some squares will fill with general fallback pool below.
       }
       timeTravel = removeUsedIds(timeTravel, idUsedSet);
       timeTravel.length = Math.min(6, timeTravel.length);
@@ -140,13 +146,18 @@ function MovieBingo({ onBackToDashboard }) {
       options[0] = timeTravel;
 
       // Cell [1]: 'Won an Award'
-      // -- TMDB doesn't mark awards, so fallback: high rating, or title/overview mentions 'award', 'winner', or 'national award'
+      // TMDB has NO Kollywood awards/oscars info; only "voted best"/hint words in overview.
+      // --- STRATEGY: Heuristically accept high-voted, high-rated titles (vote_average >= 7.2 and vote_count > 35).
+      // Also, overview/title mentioning 'award', 'winner', or 'national award'.
+      // --- If not robust: fallback is same high-rating cut-off.
       let awardWinners = allMovies.filter(m => 
         ((m.vote_average && m.vote_average >= 7.2 && m.vote_count > 35) || // heuristically, likely an award winner
          (m.overview && /award|winner|national award/.test(m.overview.toLowerCase())) ||
          (m.title && /award/.test(m.title.toLowerCase()))
         )
       );
+      // --- Documenting fallback explicitly, as this is not a robust way ---
+      // For future: would require local or crowdsourced awards dataset.
       awardWinners = removeUsedIds(awardWinners, idUsedSet);
       awardWinners.length = Math.min(6, awardWinners.length);
 
@@ -154,7 +165,8 @@ function MovieBingo({ onBackToDashboard }) {
       options[1] = awardWinners;
 
       // Cell [2]: 'Comedy Classic'
-      // -- Use genre Comedy (TMDB: 35), fallback: overview has 'comedy' or 'laugh'.
+      // STRATEGY: Use TMDB's genre 'Comedy' (id: 35).
+      // Fallback: If not enough movies, use keyword in overview.
       let comedy = allMovies.filter(m => (m.genre_ids || []).includes(35) || (m.overview && m.overview.toLowerCase().includes("comedy")));
       comedy = removeUsedIds(comedy, idUsedSet);
       comedy.length = Math.min(6, comedy.length);
@@ -163,7 +175,8 @@ function MovieBingo({ onBackToDashboard }) {
       options[2] = comedy;
 
       // Cell [3]: 'Love Story'
-      // -- Use genre Romance (TMDB: 10749), fallback: overview contains "love", "romance", "couple"
+      // STRATEGY: Use TMDB's genre 'Romance' (id: 10749) as primary filter.
+      // Fallback: Accept 'love', 'romance', or 'couple' in overview (not robust, so comment fallback).
       let love = allMovies.filter(m => (m.genre_ids || []).includes(10749) || (m.overview && /love|romance|couple/.test(m.overview.toLowerCase())));
       love = removeUsedIds(love, idUsedSet);
       love.length = Math.min(6, love.length);
@@ -171,18 +184,22 @@ function MovieBingo({ onBackToDashboard }) {
       options[3] = love;
 
       // Cell [4]: 'Song Hit'
-      // -- Not an explicit genre; fallback: overview or title mentions "song", "music", "hit album", or "superhit".
+      // There is NO explicit music-hit genre in TMDB for Tamil.
+      // STRATEGY: overview or title contains "song", "music", "album", "hit", "superhit".
+      // Fallback: Just overview-based matching; DOCUMENT limitation.
       let songHit = allMovies.filter(m =>
-        (m.overview && /(music|song|album|hit)/i.test(m.overview)) ||
-        (m.title && /(song|music|album|hit)/i.test(m.title))
+        (m.overview && /(music|song|album|hit|superhit)/i.test(m.overview)) ||
+        (m.title && /(song|music|album|hit|superhit)/i.test(m.title))
       );
+      // Fallback: This is not robust and can return unrelated movies if TMDB overviews are incomplete.
       songHit = removeUsedIds(songHit, idUsedSet);
       songHit.length = Math.min(6, songHit.length);
       songHit.forEach(m => idUsedSet.add(m.id));
       options[4] = songHit;
 
       // Cell [5]: 'Police Story'
-      // -- Use TMDB genre 'Crime' (80), or overview/title contains "police", "cop", "investigation"
+      // STRATEGY: Use TMDB genre 'Crime' (id: 80); fallback: keywords in overview or title.
+      // ('police', 'cop', 'investigation', 'officer') as fuzzy match.
       let police = allMovies.filter(m =>
         (m.genre_ids || []).includes(80) ||
         (m.overview && /police|cop|investigation|officer/.test(m.overview.toLowerCase())) ||
@@ -194,7 +211,8 @@ function MovieBingo({ onBackToDashboard }) {
       options[5] = police;
 
       // Cell [6]: 'Revenge'
-      // -- overview or title has "revenge"
+      // STRATEGY: 'revenge' in overview or title.
+      // Fallback: None; can't query for this directly in TMDB.
       let revenge = allMovies.filter(m =>
         (m.overview && /revenge/.test(m.overview.toLowerCase())) ||
         (m.title && /revenge/.test(m.title.toLowerCase()))
@@ -205,12 +223,15 @@ function MovieBingo({ onBackToDashboard }) {
       options[6] = revenge;
 
       // Cell [7]: 'Superstar Rajini'
-      // -- TMDB API cannot filter by cast without another call; fallback: title/overview contains "rajini" or "Rajinikanth"
+      // TMDB cannot directly filter by cast name for Kollywood via its discover API in one request.
+      // STRATEGY: 'Rajini' or 'Rajinikanth' in title/overview, OR known canonical Rajini films.
+      // Fallback: Add a known Rajini films list as secondary filter.
+      // --- Inline fallback list is documented for maintainability.
       let rajini = allMovies.filter(
-        m => (m.title && /rajini/i.test(m.title)) ||
-             (m.overview && /rajini/i.test(m.overview))
+        m => (m.title && /rajini|rajinikanth/i.test(m.title)) ||
+             (m.overview && /rajini|rajinikanth/i.test(m.overview))
       );
-      // Also include known Rajini movies by regex
+      // Supplement Rajinikanth list if under-filled
       if (rajini.length < 3) {
         const rajiniKnown = ["Baasha", "Muthu", "Sivaji", "Padayappa", "Enthiran", "Kabali", "Petta", "Darbar"];
         rajini = [
@@ -225,21 +246,23 @@ function MovieBingo({ onBackToDashboard }) {
       options[7] = rajini;
 
       // Cell [8]: 'Debut Film'
-      // -- fallback: movies with lowest vote count and release year > 2005 (approx debut), or title/overview contains 'debut'
+      // STRATEGY: For lack of "debut" property, use movies released after 2001 with lowest vote_count, simulating 'early career'.
+      // Fallback: filter by 'debut' in overview/title, or―if still low―pick lowest vote_count regardless of year.
       let debut = allMovies
         .filter(m => (m.release_date && Number(m.release_date.slice(0, 4)) >= 2001))
         .sort((a, b) => (a.vote_count || 0) - (b.vote_count || 0));
       debut = debut.slice(0, 18);
       debut = debut.filter(m => m.vote_count < 18 || (m.overview && /debut/i.test(m.overview)) || (m.title && /debut/i.test(m.title)));
-      // If not enough, fill up from any movie with low vote_count
+      // If not enough, fill from any movie with low vote_count (explicit fallback)
       if (debut.length < 3) debut = allMovies.sort((a, b) => (a.vote_count || 0) - (b.vote_count || 0)).slice(0, 6);
       debut = removeUsedIds(debut, idUsedSet);
       debut.length = Math.min(6, debut.length);
       debut.forEach(m => idUsedSet.add(m.id));
       options[8] = debut;
 
-
-      // Sanity check: if any cell is empty, fallback to generic random sample from remaining (shouldn't happen unless TMDB is empty)
+      // --- GENERAL FALLBACK ---
+      // If any cell's options are empty (TMDB data too limited), fill with random movies that haven't been used in any cell.
+      // This ensures game is still playable and visually documents this explicitly in the fallback DIV in UI.
       const fallbackOptions = allMovies.filter(m => !idUsedSet.has(m.id)).slice(0, 8);
       for (let c = 0; c < 9; ++c) {
         if (!options[c] || options[c].length === 0) options[c] = [...fallbackOptions];
