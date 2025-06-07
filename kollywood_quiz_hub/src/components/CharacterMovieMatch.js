@@ -4,194 +4,168 @@ import QuizProgress from "./QuizProgress";
 import QuizResult from "./QuizResult";
 
 /**
- * Character-Movie Match Component
+ * Character-Movie Match: Drag Kollywood character clue onto correct movie poster (with distractors), 10 quiz rounds.
  * PUBLIC_INTERFACE
- * Presents a Kollywood character and choices of movies (with posters and names).
- * For each question, ensures the correct movie (matching character) is always one of the options,
- * the remaining options are random plausible distractors (not the answer),
- * and all options have both poster and title whenever possible.
  */
 function CharacterMovieMatch({ onBackToDashboard }) {
+  // Number of rounds/rounds
   const QUESTIONS = 10;
-  // How many choices per question (including the correct one)
-  const CHOICES_PER_QUESTION = 3;
-  // Static (stub) list of characters matched to movies
-  // All character names match a canonical famous character with distinct (primary) movie titles.
-  // Each entry has character: string, movies: array of canonical (release title matched) movie names
-  const CHARACTERS = [
-    { name: "Vikram", movies: ["Anniyan", "I"] },
-    { name: "Chitti", movies: ["Enthiran", "2.0"] },
-    { name: "Saroja Devi", movies: ["Thillana Mohanambal"] },
-    { name: "Arjun", movies: ["Gentleman"] },
-    { name: "Nallasivam", movies: ["Anbe Sivam"] },
-    { name: "Anbuchelvan IPS", movies: ["Kaakha Kaakha"] },
-    { name: "Subramani", movies: ["Mouna Ragam"] },
-    { name: "Rangasamy", movies: ["Sivaji"] },
-    { name: "Dhanush", movies: ["VIP", "Maari"] },
-    { name: "Velu Naicker", movies: ["Nayakan"] },
-    // Add more as needed for variety & robustness
+  // Choices per question (1 correct + this many distractors)
+  const CHOICES_PER_QUESTION = 4;
+
+  // List of clue characters and their associated movies (primary roles, all matches should exist in TMDB pool)
+  // Each entry: { character: String, movie: String }
+  const CHARACTER_MOVIE_PAIRS = [
+    { character: "Chitti", movie: "Enthiran" },
+    { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
+    { character: "Velu Naicker", movie: "Nayakan" },
+    { character: "Gentleman", movie: "Gentleman" },
+    { character: "Saroja Devi", movie: "Thillana Mohanambal" },
+    { character: "Maari", movie: "Maari" },
+    { character: "Subramani", movie: "Mouna Ragam" },
+    { character: "Dhanush", movie: "VIP" },
+    { character: "Nallasivam", movie: "Anbe Sivam" },
+    { character: "Rangasamy", movie: "Sivaji" },
+    // Add more if needed later
   ];
 
-  const [questions, setQuestions] = useState([]);
-  const [step, setStep] = useState(0);
-  const [userAnswers, setUserAnswers] = useState([]);
-  const [selectedMovie, setSelectedMovie] = useState("");
-  const [draggedChar, setDraggedChar] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // State declarations
+  const [allMovies, setAllMovies] = useState([]);
+  const [questions, setQuestions] = useState([]); // One entry per quiz round: { clue, correctMovieObj, choices: [movieObj,...] }
+  const [step, setStep] = useState(0); // current question index
+  const [dragActive, setDragActive] = useState(false);
+  const [draggedClue, setDraggedClue] = useState(null); // {character, movie}
+  const [answeredIdx, setAnsweredIdx] = useState(null); // to mark which card was answered
+  const [userAnswers, setUserAnswers] = useState([]); // each: { character, answerTitle, wasCorrect, correctTitle }
   const [quizOver, setQuizOver] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [reveal, setReveal] = useState(false);
-  const [justRevealed, setJustRevealed] = useState(false);
 
-  // PUBLIC_INTERFACE
+  // PUBLIC_INTERFACE: On mount, fetch movies and prepare the quiz set (10 rounds, each with proper answer & distractors)
   useEffect(() => {
     setLoading(true);
     fetchKollywoodMovies()
-      .then((allMovies) => {
-        // 1. Build array of only real (character, movie) pairs where the movie exists in TMDB AND has a poster (for proper UI)
-        const movieTitleToObj = {};
-        allMovies.forEach((movie) => {
-          if (movie.title && movie.poster_path) {
-            movieTitleToObj[movie.title] = movie;
-          }
-        });
-
-        // Only push genuine pairings from CHARACTERS; exclude those where poster is not available in TMDB
-        const validPairs = [];
-        CHARACTERS.forEach((char) => {
-          char.movies.forEach((mov) => {
-            if (movieTitleToObj[mov]) {
-              validPairs.push({
-                character: char.name,
-                movie: mov,
-                movieObj: movieTitleToObj[mov],
-              });
-            }
-          });
-        });
-
-        // If not enough valid pairs, use as many as we have, but always ensure at least one.
-        let selectedPairs = validPairs
-          .sort(() => 0.5 - Math.random())
-          .slice(0, QUESTIONS);
-
-        // If we have no valid pairs (API/data error), generate a dummy fallback question
-        if (selectedPairs.length === 0) {
-          // Try to use random movies as fake chars if available, else hard code fallback
-          const fallbackMovies = allMovies.filter(m => !!m.title && !!m.poster_path);
-          if (fallbackMovies.length > 0) {
-            selectedPairs = [{
-              character: "Fallback Character",
-              movie: fallbackMovies[0].title,
-              movieObj: fallbackMovies[0]
-            }];
-          } else {
-            selectedPairs = [{
-              character: "Fallback Char",
-              movie: "Unavailable Movie",
-              movieObj: { title: "Unavailable Movie", poster_path: "", id: -1 }
-            }];
-          }
-        }
-
-        // Prepare a set of all movies that can be used as distractors (with poster & title, not the correct answer)
-        const distractorPool = allMovies.filter(
-          m => !!m.title && !!m.poster_path
+      .then((movies) => {
+        const withPosters = movies.filter(
+          (m) => m.title && m.poster_path && m.poster_path.length > 0
         );
 
-        // Create questions array: Each clue is character (from selectedPair), correct answer is associated movie,
-        // options contain the correct answer and two distractors not tied to the clue's character.
-        const questionsBuilt = selectedPairs.map(pair => {
-          // Find distractors that are not correct (by title), and are not tied to this character in CHARACTERS
-          const charMovieTitles = CHARACTERS
-            .find(c => c.name === pair.character)?.movies || [];
-          const correctMovieTitle = pair.movie;
-
-          // Find distractors that are not associated with this character at all and not the answer
-          let possibleDistractors = distractorPool.filter(m =>
-            m.title !== correctMovieTitle && !charMovieTitles.includes(m.title)
+        // Build answer pool for the rounds: map characters to actual available movies (with poster)
+        const answerPool = CHARACTER_MOVIE_PAIRS.map(pair => {
+          const movieObj = withPosters.find(
+            m => m.title.toLowerCase() === pair.movie.toLowerCase()
           );
+          return movieObj
+            ? { character: pair.character, movie: pair.movie, movieObj }
+            : null;
+        }).filter(Boolean);
 
-          // Shuffle to pick random distractors
-          possibleDistractors = possibleDistractors.sort(() => 0.5 - Math.random());
+        // Use only as many as possible with actual poster, max 10
+        const rounds = answerPool.slice(0, QUESTIONS);
 
-          // Pick two distractors, fallback to as many as possible
-          const distractorOptions = possibleDistractors.slice(0, CHOICES_PER_QUESTION - 1).map(m => ({
-            movie: m.title,
-            movieObj: m
-          }));
+        // For each round, build answer + distractors
+        const roundData = rounds.map(ans => {
+          // Pool for distractors: exclude the correct movie (by title)
+          let distractorPool = withPosters
+            .filter(m => m.title !== ans.movie)
+            .sort(() => 0.5 - Math.random());
 
-          // Always include correct answer option as object (may fallback)
-          const correctOption = {
-            movie: pair.movieObj.title,
-            movieObj: pair.movieObj
-          };
+          // Choose distractor objects (as full movieObjs)
+          let distractors = distractorPool.slice(0, CHOICES_PER_QUESTION - 1);
 
-          // Combine and shuffle options, but only use as many as possible (never <1)
-          let options = [correctOption, ...distractorOptions].sort(() => 0.5 - Math.random());
-          if (options.length === 0) {
-            // Absolute fallback - should never happen, but just in case
-            options = [{ movie: correctOption.movie, movieObj: correctOption.movieObj }];
-          }
-
-          // Guarantee there are only CHOICES_PER_QUESTION options or as many as possible, but never empty
+          // Combine and shuffle
+          const options = [ans.movieObj, ...distractors].sort(() => 0.5 - Math.random());
           return {
-            character: pair.character,
-            correctMovie: correctMovieTitle,
-            correctMovieObj: pair.movieObj,
-            choices: options.slice(0, CHOICES_PER_QUESTION)
+            clue: ans.character,
+            correctMovie: ans.movie,
+            correctMovieObj: ans.movieObj,
+            choices: options,
           };
         });
 
-        setQuestions(questionsBuilt);
+        setAllMovies(withPosters); // Save for possible fallback use
+        setQuestions(roundData);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
 
-  function handleDrop(movie, e) {
-    e.preventDefault();
-    setSelectedMovie(movie);
+  // Handle drop on a movie poster (answer selection)
+  function handleDropOnPoster(movieObj, idx, event) {
+    event.preventDefault();
+    if (answeredIdx !== null) return;
+    setAnsweredIdx(idx);
+
+    // After visual feedback, score and move on
+    setTimeout(() => {
+      recordAnswer(movieObj);
+    }, 350); // 0.35s for feedback
   }
 
-  function handleSubmit(e) {
-    e.preventDefault();
+  function allowDrop(event) {
+    event.preventDefault();
+    setDragActive(true);
+  }
+  function leaveDrop(event) {
+    event.preventDefault();
+    setDragActive(false);
+  }
+
+  function handleDragStart() {
+    setDraggedClue(questions[step]);
+    setDragActive(true);
+  }
+  function handleDragEnd() {
+    setDraggedClue(null);
+    setDragActive(false);
+  }
+
+  function recordAnswer(selectedMovieObj) {
+    if (!questions[step]) return;
+    const isCorrect = selectedMovieObj.title === questions[step].correctMovie;
     setUserAnswers([
       ...userAnswers,
       {
-        guessedMovie: selectedMovie,
-        actualMovie: questions[step].correctMovie,
-        wasCorrect: selectedMovie === questions[step].correctMovie,
-        character: questions[step].character,
+        character: questions[step].clue,
+        answerTitle: selectedMovieObj.title,
+        wasCorrect: isCorrect,
+        correctTitle: questions[step].correctMovie,
       },
     ]);
-    setSelectedMovie("");
-    if (step + 1 === QUESTIONS) setQuizOver(true);
-    else setStep(step + 1);
+    setAnsweredIdx(null);
+    setDragActive(false);
+
+    // Proceed to next or show result after brief pause
+    setTimeout(() => {
+      if (step + 1 === QUESTIONS) setQuizOver(true);
+      else setStep(step + 1);
+    }, 450);
   }
 
+  // For reveal button (treat as "give up", add wrong answer and move forward)
   function handleReveal() {
     setReveal(true);
     setUserAnswers([
       ...userAnswers,
       {
-        guessedMovie: "",
-        actualMovie: questions[step].correctMovie,
+        character: questions[step].clue,
+        answerTitle: "(revealed)",
         wasCorrect: false,
-        character: questions[step].character,
-        revealed: true
-      }
+        correctTitle: questions[step].correctMovie,
+        revealed: true,
+      },
     ]);
-    setJustRevealed(true);
     setTimeout(() => {
       setReveal(false);
-      setSelectedMovie("");
-      setJustRevealed(false);
       if (step + 1 === QUESTIONS) setQuizOver(true);
       else setStep(step + 1);
     }, 1800);
   }
 
-  if (loading) return <div className="container" style={{ paddingTop: 120 }}>Loading...</div>;
+  // Loading state
+  if (loading)
+    return <div className="container" style={{ paddingTop: 120 }}>Loading quiz...</div>;
+  // End of quiz
   if (quizOver)
     return (
       <QuizResult
@@ -202,73 +176,89 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         game="Character-Movie Match"
       />
     );
-  // Instead of returning null, render a user-friendly error if something went wrong
+  // No valid questions? Show fallback.
   if (!questions[step]) {
     return (
       <div className="container" style={{ paddingTop: 120 }}>
-        <h2 className="title" style={{ fontSize: "1.2em" }}>Character-Movie Match</h2>
-        <div className="description" style={{ color: "#b72d2d", marginBottom: 20 }}>
-          Sorry, could not load quiz questions for this game.<br />
-          Please try reloading the page, or pick a different quiz game from the dashboard.
+        <h2 className="title" style={{ fontSize: "1.25em" }}>Character-Movie Match</h2>
+        <div className="description" style={{ color: "#c23616", marginBottom: 20 }}>
+          Sorry, no quiz questions could be generated right now.<br />
+          Please try again later or reload to retry.
         </div>
         <button className="btn btn-large" onClick={onBackToDashboard}>Back to Dashboard</button>
       </div>
     );
   }
 
-  // Display question: show the character and randomized movie choices; correct answer MUST always be present among the choices.
+  // Render single quiz round
+  const question = questions[step];
+
   return (
-    <div className="container" style={{ paddingTop: 100 }}>
+    <div className="container" style={{ paddingTop: 100, marginBottom: 40 }}>
       <button className="btn" style={{ marginBottom: 24 }} onClick={onBackToDashboard}>
         ⬅ Back
       </button>
       <QuizProgress current={step + 1} total={QUESTIONS} />
-      <h2 className="title" style={{ fontSize: "1.6rem", marginBottom: 13 }}>
+      <h2 className="title" style={{ fontSize: "1.65rem", marginBottom: 13 }}>
         Character-Movie Match
       </h2>
       <div className="description" style={{ marginBottom: 18 }}>
-        Match the Kollywood character to their movie (by dragging or clicking).
+        Drag the <b>character clue</b> onto the correct movie poster.
+        <br />
+        {`(1 correct poster, ${CHOICES_PER_QUESTION - 1} decoy posters per round)`}
       </div>
+
       <div style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center"
+        display: "flex", flexDirection: "column", alignItems: "center",
       }}>
-        <div style={{
-          background: "#f5f5f5",
-          padding: 15,
-          borderRadius: 8,
-          color: "#183396",
-          fontWeight: 600,
-          fontSize: 22,
-          marginBottom: 16,
-          minWidth: 200
-        }}
-          draggable
-          onDragStart={() => setDraggedChar(questions[step].character)}
+        {/* DRAGGABLE CHARACTER CLUE */}
+        <div
+          style={{
+            background: "#f6fcfc",
+            color: "#1255ae",
+            fontWeight: 600,
+            fontSize: 28,
+            borderRadius: 10,
+            padding: "22px 34px",
+            margin: "15px 0 20px 0",
+            minWidth: 220,
+            boxShadow: dragActive ? "0 0 16px #a7e6ec" : "0 0 8px #dde4fa",
+            opacity: reveal ? 0.4 : 1,
+            cursor: reveal ? "not-allowed" : "grab",
+            transition: "box-shadow 0.18s, opacity 0.16s"
+          }}
+          draggable={!reveal}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         >
-          {questions[step].character}
+          {question.clue}
         </div>
-        <div style={{
-          display: "flex",
-          gap: "32px",
-          margin: "16px 0",
-          justifyContent: "center",
-          flexWrap: "wrap"
-        }}>
-          {/* Show movie choices; correct answer always present */}
-          {questions[step].choices.map(opt => (
+        {/* POSTER CHOICES */}
+        <div
+          style={{
+            display: "flex",
+            gap: "32px",
+            margin: "16px 0 24px 0",
+            justifyContent: "center",
+            flexWrap: "wrap",
+            opacity: reveal ? 0.4 : 1,
+            pointerEvents: reveal ? "none" : "auto"
+          }}
+        >
+          {question.choices.map((movieObj, idx) => (
             <div
-              key={opt.movie}
-              onDrop={e => { handleDrop(opt.movie, e); setDraggedChar(null); }}
-              onDragOver={e => e.preventDefault()}
-              tabIndex={0}
+              key={movieObj.id || idx}
+              onDrop={e => handleDropOnPoster(movieObj, idx, e)}
+              onDragOver={allowDrop}
+              onDragLeave={leaveDrop}
               style={{
-                background: "#e0eefc",
+                background: "#f7faff",
                 minWidth: 130,
-                minHeight: 180,
-                border: selectedMovie === opt.movie ? "2px solid #4796e6" : "2px dashed #aaa",
-                borderRadius: 7,
+                minHeight: 210,
+                border: answeredIdx === idx
+                  ? (movieObj.title === question.correctMovie ? "3px solid #2acd86" : "3px solid #da364a")
+                  : "2px solid #bae8f7",
+                borderRadius: 12,
                 alignItems: "center",
                 display: "flex",
                 flexDirection: "column",
@@ -277,82 +267,92 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                 color: "#111",
                 fontWeight: 500,
                 margin: 6,
-                cursor: "pointer",
-                boxShadow: selectedMovie === opt.movie ? "0 2px 12px #b9e5ff" : "0 1px 6px #e2f2fd"
+                cursor: dragActive && !reveal ? "pointer" : "default",
+                boxShadow: answeredIdx === idx
+                  ? (movieObj.title === question.correctMovie ? "0 0 18px #49f1b7" : "0 0 14px #ffb2bc")
+                  : "0 3px 10px #ecf2fb",
+                opacity: dragActive ? 0.93 : 1,
+                position: "relative",
+                transition: "box-shadow 0.25s, border 0.21s, opacity 0.12s"
               }}
-              onClick={() => setSelectedMovie(opt.movie)}
+              tabIndex={0}
+              aria-label={`Drop character here for ${movieObj.title}`}
             >
-              {opt.movieObj.poster_path ? (
+              {movieObj.poster_path ? (
                 <img
-                  src={`https://image.tmdb.org/t/p/w185${opt.movieObj.poster_path}`}
-                  alt={opt.movie}
+                  src={`https://image.tmdb.org/t/p/w342${movieObj.poster_path}`}
+                  alt={movieObj.title}
                   style={{
-                    width: "100%",
-                    maxWidth: 120,
-                    height: "auto",
-                    aspectRatio: "110/160",
-                    borderRadius: "6px",
+                    width: "110px",
+                    height: "160px",
+                    borderRadius: 7,
                     objectFit: "cover",
-                    marginTop: 10,
-                    marginBottom: 0,
-                    background: "#eaf1ff",
-                    border: selectedMovie === opt.movie
-                      ? "2px solid #4796e6"
-                      : "2px solid #e0eefc",
-                    boxShadow: selectedMovie === opt.movie
-                      ? "0 2px 12px #b9e5ff"
-                      : "0 1px 4px #e2f2fd"
+                    boxShadow: "0 4px 16px #b3d5ef33",
+                    marginTop: 14,
+                    marginBottom: 8,
+                    border: "2px solid #cbeef3",
+                    background: "#ebf5fb",
                   }}
                   loading="lazy"
                 />
               ) : (
                 <div style={{
-                  width: 110,
-                  height: 160,
-                  background: "#ccd7e9",
-                  borderRadius: 5,
-                  marginTop: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#789",
-                  fontSize: 14,
-                  fontWeight: 500
+                  width: 110, height: 160, background: "#d3e0ea",
+                  borderRadius: 6, marginTop: 14,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#678", fontSize: 12,
+                  fontWeight: 500,
                 }}>
                   No Poster
                 </div>
               )}
               <div style={{
-                marginTop: 10,
+                marginTop: 4,
                 textAlign: "center",
                 fontWeight: 600,
-                fontSize: 17,
+                fontSize: 16,
+                width: 120,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                width: 110
+                userSelect: "none",
+                background: "rgba(245,250,250, 0.8)",
+                borderRadius: 6,
+                padding: "4px 0"
               }}>
-                {opt.movie}
+                {movieObj.title}
               </div>
+              {/* Feedback tick/cross icon only if answered */}
+              {answeredIdx === idx && (
+                <span style={{
+                  position: "absolute",
+                  right: 10,
+                  top: 10,
+                  fontSize: 32,
+                  color: movieObj.title === question.correctMovie ? "#2acd86" : "#ed2e40"
+                }}>
+                  {movieObj.title === question.correctMovie ? "✔️" : "✖️"}
+                </span>
+              )}
             </div>
           ))}
         </div>
-        <form onSubmit={handleSubmit}>
-          <button type="submit" className="btn btn-large" style={{ marginTop: 16, width: 160, color: "#111", background: "#a9e9c9" }} disabled={!selectedMovie || reveal || justRevealed}>
-            Submit
-          </button>
-        </form>
+
         <button
           className="btn"
-          style={{ marginTop: 12, background: "#efb307", color: "#211" }}
+          style={{
+            marginTop: 8, color: "#432", background: "#ffe14d",
+            pointerEvents: reveal ? "none" : "auto"
+          }}
           onClick={handleReveal}
-          disabled={reveal || justRevealed}
+          disabled={reveal}
         >
           Reveal Answer
         </button>
+
         {reveal && (
-          <div style={{ marginTop: 20, color: "#b11324", fontWeight: 600 }}>
-            The correct answer: {questions[step].correctMovie}
+          <div style={{ marginTop: 23, color: "#ed3529", fontWeight: 700, fontSize: 18 }}>
+            The correct answer: {question.correctMovie}
           </div>
         )}
       </div>
@@ -361,3 +361,4 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 }
 
 export default CharacterMovieMatch;
+
