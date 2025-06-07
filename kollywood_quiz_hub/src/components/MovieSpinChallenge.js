@@ -444,49 +444,7 @@ function MovieSpinChallenge({ onBackToDashboard }) {
             : "Spin Wheels!"}
         </button>
       </div>
-      {finalTriple && (
-        <div
-          style={{
-            background: "#232323",
-            color: "#fff",
-            borderRadius: 12,
-            padding: "23px 8px 9px 8px",
-            textAlign: "center",
-            fontWeight: 700,
-            margin: "7px auto 0",
-            fontSize: 19,
-            maxWidth: 420,
-            marginBottom: 18,
-            boxShadow: "0 0 19px #28282a77",
-            textShadow: "0 1px 11px #000, 0 2px 22px #2227",
-            border: "2.2px solid var(--base-light)",
-          }}
-        >
-          <span>
-            <span style={{ color: "#ffe442", fontWeight: 800 }}>Your Movie Spin:</span>{" "}
-            <span style={{
-              color: "#24bec9", background: "#14232e", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
-              fontWeight: 700, textShadow: "0 2px 10px #013, 0 1px 18px #1605"
-            }}>
-              {finalTriple.hero}
-            </span>
-            {" | "}
-            <span style={{
-              color: "#ffd700", background: "#524000", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
-              fontWeight: 700, textShadow: "0 2px 13px #b36d05, 0 1px 18px #0008"
-            }}>
-              {finalTriple.heroine}
-            </span>
-            {" | "}
-            <span style={{
-              color: "#fff", background: "#5f24ad", borderRadius: 7, padding: "2.5px 8px", margin: "0 2px",
-              fontWeight: 700, textShadow: "0 2px 11px #29014f, 0 1px 17px #2e0145"
-            }}>
-              {finalTriple.year}
-            </span>
-          </span>
-        </div>
-      )}
+      {/* The explicit spun combination display box (e.g., 'Your Movie Spin: ...') was removed as per requirements. */}
       {finalTriple && (
         <div style={{ textAlign: "center", marginBottom: 16, marginTop: -9 }}>
           <button
