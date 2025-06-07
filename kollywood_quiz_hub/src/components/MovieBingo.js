@@ -2,7 +2,14 @@ import React, { useState, useEffect } from "react";
 import { fetchKollywoodMovies, tmdbGet } from "../api/tmdb";
 import QuizResult from "./QuizResult";
 
-// MOVIE TITLE EXCLUSIONS: Used in other game quiz pools (BlurredPosterQuiz, CharacterMovieMatch, EmojiMovieQuiz).
+/*
+ * MOVIEBINGO ACTUAL CATEGORY/MOVIE LOGIC MODULE
+ *  - Robust per-category movie assignment based on TMDB live data and code-documented logic.
+ *  - Cross-game de-duplication (no repeated movies from BlurredPosterQuiz, CharacterMovieMatch, EmojiMovieQuiz).
+ *  - Fallbacks and explicit JS doc for categories not supported by TMDB.
+ */
+
+// --- MOVIE TITLE EXCLUSIONS: used by other game pools: ---
 const POSTER_QUIZ_MOVIES = [
   "Enthiran", "3 Idiots", "Premam", "Kaakha Kaakha", "Baasha",
   "Vikram Vedha", "Super Deluxe", "Nayakan", "I", "Mersal"
@@ -12,13 +19,20 @@ const CHARACTER_MATCH_MOVIES = [
   "Muthu", "Maari", "Mouna Ragam", "Anbe Sivam", "Sivaji"
 ];
 const EMOJI_QUIZ_MOVIES = [
-  "Enthiran","3 Idiots","Premam","Kaakha Kaakha","Baasha","Vikram Vedha",
-  "Super Deluxe","Nayakan","I","Mersal"
+  "Enthiran", "3 Idiots", "Premam", "Kaakha Kaakha", "Baasha",
+  "Vikram Vedha", "Super Deluxe", "Nayakan", "I", "Mersal"
 ];
+
+// Helper to normalize titles for exclusion
 function getUsedMovieTitleSet() {
-  let allTitles = [...POSTER_QUIZ_MOVIES, ...CHARACTER_MATCH_MOVIES, ...EMOJI_QUIZ_MOVIES];
+  let allTitles = [
+    ...POSTER_QUIZ_MOVIES, 
+    ...CHARACTER_MATCH_MOVIES, 
+    ...EMOJI_QUIZ_MOVIES
+  ];
+  // Remove all space, special chars, lowercase
   return new Set(allTitles.map(t =>
-    t
+    (t || "")
       .toLowerCase()
       .replace(/[\s()\-\:\'\.,_]+/g,'')
   ));
@@ -28,7 +42,6 @@ function normalizeMovieTitle(title) {
     .toLowerCase()
     .replace(/[\s()\-\:\'\.,_]+/g,'');
 }
-
 /**
  * PUBLIC_INTERFACE
  * Movie Bingo game, with robust per-category filtering and TMDB integration.
@@ -64,199 +77,243 @@ function MovieBingo({ onBackToDashboard }) {
   // PUBLIC_INTERFACE
   useEffect(() => {
     /**
-     * Main function: fetches, filters, and assigns options for each bingo square based on TMDB.
+     * Main logic: each bingo square gets only Kollywood movies accurately matched by TMDB data,
+     * with explicit category-movie mapping, exclusions, robust fallback, and
+     * detailed in-code documentation for each mapping.
      */
-    async function fetchAndAssignOptions() {
+    async function buildMovieBingoGrid() {
       setLoading(true);
       setError("");
-      let allMovies = [];
-      let page;
-      const maxPages = 6; // Large pool for better coverage
 
+      // Step 1: Fetch a large pool with pagination for coverage
+      let allMovies = [];
       try {
-        const allResults = [];
-        for (page = 1; page <= maxPages; ++page) {
+        let moviesAccum = [];
+        for (let page = 1; page <= 7; ++page) {
           const url = `https://api.themoviedb.org/3/discover/movie?api_key=5bc67d3b06aecbd18121a3cbbc16eb59&with_original_language=ta&sort_by=popularity.desc&page=${page}`;
-          let resp = await fetch(url);
+          const resp = await fetch(url);
           if (!resp.ok) break;
-          let data = await resp.json();
-          if (data?.results?.length) allResults.push(...data.results);
+          const { results = [] } = await resp.json();
+          if (results.length === 0) break;
+          moviesAccum = moviesAccum.concat(results);
         }
-        // De-dupe by id
-        const deduped = {};
-        for (const m of allResults) if (m && m.id) deduped[m.id] = m;
-        allMovies = Object.values(deduped);
-      } catch (err) {
+        // De-duplicate by TMDB id
+        const byId = {};
+        for (const m of moviesAccum) if (m && m.id) byId[m.id] = m;
+        allMovies = Object.values(byId);
+      } catch (e) {
         setError("Could not load movies from TMDB. Try again later.");
         setLoading(false);
         return;
       }
-
-      // Exclude movies in other games (by normalized title).
+      // Step 2: Remove all movies used by any other game!
       const usedTitleSet = getUsedMovieTitleSet();
-      allMovies = allMovies.filter(m => {
-        if (!m.title) return false;
-        return !usedTitleSet.has(normalizeMovieTitle(m.title));
-      });
+      allMovies = allMovies.filter(
+        m => m && m.title && !usedTitleSet.has(normalizeMovieTitle(m.title))
+      );
 
-      // Remove used TMDB ids (per grid cell) to prevent repeats in-board
-      function removeUsedIds(arr, globalUsedIds) {
-        return arr.filter(movie => !globalUsedIds.has(movie.id));
+      // Step 3: Dedicated category logic for each square (documented!)
+
+      // Utility to remove already used ids (on this board, to avoid double-use)
+      function removeUsedMovies(arr, idset) {
+        return arr.filter(movie => !idset.has(movie.id));
       }
 
-      // For advanced categories, sometimes need to fetch details (e.g., cast).
-      // Helper to fetch full movie details from TMDB (for cast/crew/certification).
-      async function getMovieDetails(id) {
-        try {
-          const data = await tmdbGet(`/movie/${id}`, { language: "ta" });
-          return data;
-        } catch (e) {
-          return null;
-        }
-      }
+      // For edge cases & improved relevance, will supplement some squares with detailed logic.
+      // For "Has a Dance Sequence", direct TMDB metadata is missing: must fallback to hardcoded + strong heuristics!
+      const DANCE_SEQUENCE_MOVIES = [
+        "Sivaji", "Muthu", "Petta", "Anniyan", "Kadhalan", "Kuthu"
+      ];
 
-      // Main per-category filtering logic:
-      const options = [];
+      // Also, to catch "Superstar Rajini": use override list if TMDB fails.
+      const RAJINI_KNOWN = [
+        "Baasha", "Muthu", "Sivaji", "Padayappa", "Enthiran", "Kabali", "Petta", "Darbar"
+      ];
+
+      // Build grid:
+      const newOptionsGrid = [];
       let idUsedSet = new Set();
 
-      // [0] Time Travel
-      // - Keyword match (`time travel`, `Indru Netru Naalai`, `24`, etc) in title/overview
-      // - Also include any genre_ids 14 (Fantasy) as fallback
-      const timeTravelKeywords = [
-        "time travel", "time-travel", "future", "past", "machine", "Indru Netru Naalai", "24", "Maanaadu"
-      ];
-      let timeTravel = allMovies.filter(
-        m =>
-          timeTravelKeywords.some(kw =>
-            (m.title && m.title.toLowerCase().includes(kw.toLowerCase())) ||
-            (m.overview && m.overview.toLowerCase().includes(kw.toLowerCase()))
-          ) ||
-          (m.overview && /\btime\b/.test(m.overview.toLowerCase()))
-      );
-      // Fallback if not enough results: Fantasy genre (id 14)
-      if (timeTravel.length < 2) {
-        timeTravel = allMovies.filter(m => (m.genre_ids || []).includes(14) || (m.overview && m.overview.toLowerCase().includes("fantasy")));
-      }
-      timeTravel = removeUsedIds(timeTravel, idUsedSet);
-      timeTravel.length = Math.min(6, timeTravel.length);
-      timeTravel.forEach(m => idUsedSet.add(m.id));
-      options[0] = timeTravel;
+      // INDEX: category-to-logic
+      // 0: Time Travel (keyword/title/overview, fantasy genre)
+      // 1: Has a Dance Sequence (fallback: hardcoded list + overview keywords)
+      // 2: Comedy Classic (genre 35)
+      // 3: Love Story (genre 10749 or "love"/"romance" in overview)
+      // 4: Song Hit (keyword "song/music/hit" etc)
+      // 5: Police Story (genre 80, or keywords in title/overview)
+      // 6: Revenge (keyword "revenge")
+      // 7: Superstar Rajini (cast/overview or override)
+      // 8: Debut Film (lowest vote count, /debut/ in overview/title, see doc)
 
-      // [1] Has a Dance Sequence -- NOT SUPPORTED by TMDB (no "dance" metadata)!
-      // Hardcoded fallback: use DANCE_SEQUENCE_MOVIES and find their TMDB objects;
-      // And, for possible matches, keyword "dance" in title/overview. See detailed doc below.
-      let danceMovies = [
+      // ---------- [0] TIME TRAVEL ----------
+      // We look for explicit hit movies as well as use TMDB metadata
+      const TIME_TRAVEL_HITS = ["Indru Netru Naalai", "24", "Maanaadu"];
+      const timeTravelCandidates = allMovies.filter(
+        m =>
+          (TIME_TRAVEL_HITS.some(hit =>
+            (m.title && m.title.toLowerCase().includes(hit.toLowerCase()))
+          )) ||
+          (m.title && /time\s*travel|future|past/i.test(m.title)) ||
+          (m.overview && /time\s*travel|future|past|machine/i.test(m.overview)) ||
+          (Array.isArray(m.genre_ids) && m.genre_ids.includes(14)) ||
+          (m.overview && /\bfantasy\b/i.test(m.overview))
+      );
+      const timeTravel = removeUsedMovies(timeTravelCandidates, idUsedSet).slice(0, 6);
+      timeTravel.forEach(m => idUsedSet.add(m.id));
+      newOptionsGrid[0] = timeTravel;
+      // -- In-code clarification: TMDB does not have a dedicated "time travel" tag; this uses strong heuristics and popular titles. See above for explicit mapping and fallback.
+
+
+      // ---------- [1] HAS A DANCE SEQUENCE ----------
+      // There is NO TMDB keyword for "Dance Sequence"; we must fallback to a hardcoded list of famous dance-centric Kollywood films,
+      // extend with music genre/id 10402, and use overview keyword matches (dance|song|item number).
+      let danceChoices = [
+        ...allMovies.filter(m => DANCE_SEQUENCE_MOVIES.includes(m.title)),
         ...allMovies.filter(
           m =>
-            (DANCE_SEQUENCE_MOVIES.includes(m.title)) ||
+            (m.genre_ids || []).includes(10402) ||
             (m.overview && /dance|song|item number|step/i.test(m.overview))
         )
       ];
-      // If still too few, fallback: just movies known for musical numbers by released year/popularity
-      if (danceMovies.length < 3) {
-        danceMovies = [
-          ...danceMovies,
-          ...allMovies.filter(
-            m => m.release_date && Number(m.release_date.slice(0, 4)) > 2014 && (m.genre_ids || []).includes(10402) // Music genre
-          )
-        ];
-      }
-      // Doc Note: No direct TMDB property, so some matches may be indirect (see fallback above).
-      danceMovies = removeUsedIds(danceMovies, idUsedSet);
-      danceMovies.length = Math.min(6, danceMovies.length);
-      danceMovies.forEach(m => idUsedSet.add(m.id));
-      options[1] = danceMovies;
+      // Fallback: sort by popularity, remove duplicates
+      danceChoices = [...new Set(danceChoices.map(m => m.id))].map(
+        id => allMovies.find(m => m.id === id)
+      );
+      danceChoices = removeUsedMovies(danceChoices, idUsedSet).slice(0, 6);
+      danceChoices.forEach(m => idUsedSet.add(m.id));
+      newOptionsGrid[1] = danceChoices;
+      // -- In-code clarification: This mapping is largely hardcoded+heuristic; TMDB does not provide metadata for "has a dance sequence".
 
-      // [2] Comedy Classic - Genre 35 (Comedy)
-      let comedy = allMovies.filter(m => (m.genre_ids || []).includes(35) || (m.overview && m.overview.toLowerCase().includes("comedy")));
-      comedy = removeUsedIds(comedy, idUsedSet);
-      comedy.length = Math.min(6, comedy.length);
+
+      // ---------- [2] COMEDY CLASSIC ----------
+      // Comedy genre (35), fallback: "comedy" in overview
+      const comedyCandidates = allMovies.filter(
+        m => (m.genre_ids || []).includes(35) ||
+            (m.overview && m.overview.toLowerCase().includes("comedy"))
+      );
+      const comedy = removeUsedMovies(comedyCandidates, idUsedSet).slice(0, 6);
       comedy.forEach(m => idUsedSet.add(m.id));
-      options[2] = comedy;
+      newOptionsGrid[2] = comedy;
+      // -- Explicit code doc: mapped by TMDB genre 35 (Comedy)
 
-      // [3] Love Story - Genre 10749 (Romance), fuzzy in overview (love/romance/couple)
-      let love = allMovies.filter(m => (m.genre_ids || []).includes(10749) || (m.overview && /love|romance|couple/.test(m.overview.toLowerCase())));
-      love = removeUsedIds(love, idUsedSet);
-      love.length = Math.min(6, love.length);
+
+      // ---------- [3] LOVE STORY ----------
+      // Romance genre (10749) or 'love'/'romance'/'couple' in overview; covers wide range of Kollywood love stories.
+      const loveCandidates = allMovies.filter(
+        m =>
+          (m.genre_ids || []).includes(10749) ||
+          (m.overview && /(love|romance|couple)/i.test(m.overview))
+      );
+      const love = removeUsedMovies(loveCandidates, idUsedSet).slice(0, 6);
       love.forEach(m => idUsedSet.add(m.id));
-      options[3] = love;
+      newOptionsGrid[3] = love;
+      // -- TMDB genre 10749 or linguistic overlay
 
-      // [4] Song Hit -- No genre; fallback = keyword ("song", "music", "album", "hit", "superhit").
-      let songHit = allMovies.filter(m =>
-        (m.overview && /(music|song|album|hit|superhit)/i.test(m.overview)) ||
-        (m.title && /(song|music|album|hit|superhit)/i.test(m.title))
+
+      // ---------- [4] SONG HIT ----------
+      // This is not a TMDB genre. Use "hit", "song", "music", "superhit", "album" in overview or title.
+      const songKeywords = /(music|song|album|hit|superhit)/i;
+      const songHitCandidates = allMovies.filter(
+        m =>
+          (m.overview && songKeywords.test(m.overview)) ||
+          (m.title && songKeywords.test(m.title))
       );
-      songHit = removeUsedIds(songHit, idUsedSet);
-      songHit.length = Math.min(6, songHit.length);
+      const songHit = removeUsedMovies(songHitCandidates, idUsedSet).slice(0, 6);
       songHit.forEach(m => idUsedSet.add(m.id));
-      options[4] = songHit;
+      newOptionsGrid[4] = songHit;
+      // -- Code doc: text-match only, most robust mapping possible given TMDB fields
 
-      // [5] Police Story -- Genre 80 (Crime), OR overview/title with police/cop/officer/investigation keyword.
-      let police = allMovies.filter(m =>
-        (m.genre_ids || []).includes(80) ||
-        (m.overview && /police|cop|investigation|officer/.test(m.overview.toLowerCase())) ||
-        (m.title && /police|cop|officer/.test(m.title.toLowerCase()))
+
+      // ---------- [5] POLICE STORY ----------
+      // Either genre 80 (Crime), or keyword ("police", "cop", "officer", "investigation") in overview/title.
+      const policeCandidates = allMovies.filter(
+        m =>
+          (m.genre_ids || []).includes(80) ||
+          (m.title && /(police|cop|officer)/i.test(m.title)) ||
+          (m.overview && /(police|cop|officer|investigation)/i.test(m.overview))
       );
-      police = removeUsedIds(police, idUsedSet);
-      police.length = Math.min(6, police.length);
+      const police = removeUsedMovies(policeCandidates, idUsedSet).slice(0, 6);
       police.forEach(m => idUsedSet.add(m.id));
-      options[5] = police;
+      newOptionsGrid[5] = police;
+      // -- Mapped by genre or strong keyword
 
-      // [6] Revenge - overview/title with "revenge".
-      let revenge = allMovies.filter(m =>
-        (m.overview && /revenge/.test(m.overview.toLowerCase())) ||
-        (m.title && /revenge/.test(m.title.toLowerCase()))
+
+      // ---------- [6] REVENGE ----------
+      const revengeCandidates = allMovies.filter(
+        m =>
+          (m.overview && /revenge/i.test(m.overview)) ||
+          (m.title && /revenge/i.test(m.title))
       );
-      revenge = removeUsedIds(revenge, idUsedSet);
-      revenge.length = Math.min(6, revenge.length);
+      const revenge = removeUsedMovies(revengeCandidates, idUsedSet).slice(0, 6);
       revenge.forEach(m => idUsedSet.add(m.id));
-      options[6] = revenge;
+      newOptionsGrid[6] = revenge;
+      // -- Code doc: keyword in overview/title only, as "Revenge" is not a TMDB genre
 
-      // [7] Superstar Rajini - Find movies with Rajinikanth in title/overview or known list
-      let rajini = allMovies.filter(
-        m => (m.title && /rajini|rajinikanth/i.test(m.title)) ||
-             (m.overview && /rajini|rajinikanth/i.test(m.overview))
+
+      // ---------- [7] SUPERSTAR RAJINI ----------
+      // Look for "Rajinikanth" or "Rajini" in title/overview, or fallback to list of confirmed Rajini movies
+      let rajiniCandidates = allMovies.filter(
+        m =>
+          (m.title && /rajini|rajinikanth/i.test(m.title)) ||
+          (m.overview && /rajini|rajinikanth/i.test(m.overview))
       );
-      // If too few, supplement with a known list of Rajini movies
-      if (rajini.length < 3) {
-        const rajiniKnown = ["Baasha", "Muthu", "Sivaji", "Padayappa", "Enthiran", "Kabali", "Petta", "Darbar"];
-        rajini = [
-          ...rajini,
+      if (rajiniCandidates.length < 2) {
+        rajiniCandidates = [
+          ...rajiniCandidates,
           ...allMovies.filter(m =>
-            rajiniKnown.some(name => m.title && m.title.toLowerCase().includes(name.toLowerCase()))
+            RAJINI_KNOWN.some(name =>
+              m.title && m.title.toLowerCase().includes(name.toLowerCase())
+            )
           )
         ];
       }
-      rajini = removeUsedIds(rajini, idUsedSet);
-      rajini.length = Math.min(6, rajini.length);
+      // Dedupe and take up to 6
+      rajiniCandidates = [...new Set(rajiniCandidates.map(m => m.id))].map(
+        id => allMovies.find(m => m.id === id)
+      );
+      const rajini = removeUsedMovies(rajiniCandidates, idUsedSet).slice(0, 6);
       rajini.forEach(m => idUsedSet.add(m.id));
-      options[7] = rajini;
+      newOptionsGrid[7] = rajini;
+      // -- Code doc: mapped by fuzzy match or explicit list due to TMDB cast API limitations
 
-      // [8] Debut Film - NOT supported as a property. Attempt: lowest vote-count after 2001, or those with 'debut' in title/overview.
-      let debut = allMovies
+
+      // ---------- [8] DEBUT FILM ----------
+      // No TMDB debut property. Weakest mapping: movies with fewest votes after 2001, or explicit keyword 'debut'
+      let debutCandidates = allMovies
         .filter(m => (m.release_date && Number(m.release_date.slice(0, 4)) >= 2001))
-        .sort((a, b) => (a.vote_count || 0) - (b.vote_count || 0));
-      debut = debut.slice(0, 18);
-      debut = debut.filter(m => m.vote_count < 18 || (m.overview && /debut/i.test(m.overview)) || (m.title && /debut/i.test(m.title)));
-      // If not enough, fill lowest vote count of any year as last resort.
-      if (debut.length < 3) debut = allMovies.sort((a, b) => (a.vote_count || 0) - (b.vote_count || 0)).slice(0, 6);
-      debut = removeUsedIds(debut, idUsedSet);
-      debut.length = Math.min(6, debut.length);
+        .sort((a, b) => (a.vote_count || 0) - (b.vote_count || 0))
+        .slice(0, 18)
+        .filter(m =>
+          m.vote_count < 18 ||
+          (m.overview && /debut/i.test(m.overview)) ||
+          (m.title && /debut/i.test(m.title))
+        );
+      if (debutCandidates.length < 3) {
+        debutCandidates = allMovies
+          .sort((a, b) => (a.vote_count || 0) - (b.vote_count || 0))
+          .slice(0, 7);
+      }
+      const debut = removeUsedMovies(debutCandidates, idUsedSet).slice(0, 6);
       debut.forEach(m => idUsedSet.add(m.id));
-      options[8] = debut;
+      newOptionsGrid[8] = debut;
+      // -- In-code clarification: debut is not supported by TMDB; this is a best-effort fudge/simulation.
 
-      // GENERAL FALLBACK: Fill empty cells with a pool of remaining movies not already used in-grid.
-      const fallbackOptions = allMovies.filter(m => !idUsedSet.has(m.id)).slice(0, 8);
-      for (let c = 0; c < 9; ++c) {
-        if (!options[c] || options[c].length === 0) options[c] = [...fallbackOptions];
+
+      // ---------- FALLBACKS: Fill empty with any left-over titles (should not occur) ----------
+      // If a square still empty (edge case), pick fallback(s) from allMovies not already present.
+      const fallbackPool = removeUsedMovies(allMovies, idUsedSet).slice(0, 7);
+      for (let i = 0; i < 9; ++i) {
+        if (!Array.isArray(newOptionsGrid[i]) || newOptionsGrid[i].length === 0) {
+          newOptionsGrid[i] = [...fallbackPool];
+        }
       }
 
-      setOptionsGrid(options);
+      setOptionsGrid(newOptionsGrid);
       setUsedIds(idUsedSet);
       setLoading(false);
     }
-    fetchAndAssignOptions();
-    // Note: intentionally not including usedIds etc as dependencies!
+    buildMovieBingoGrid();
+    // empty deps: only run once!
   }, []);
 
   function handleSelect(idx, movie) {
