@@ -12,12 +12,76 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   const CHOICES_PER_QUESTION = 4;
 
   // Fallback/demo questions for demo and offline
-  // Thillana Mohanambal references have been removed.
-  // Poster overrides for VIP, Gentleman, and Muthu are strictly enforced with correct TMDB Kollywood poster paths.
-  // Confirm all movie objects for these three have correct poster_path and TMDB IDs.
+  // Updated FALLBACK_QUESTIONS for Meiyazhagan and Cuckoo; removed VIP and Gentleman as requested.
+  // All poster_paths point to genuine Kollywood TMDB posters.
   const FALLBACK_QUESTIONS = [
     {
-      clue: "mukundh varadharajan",
+      clue: "Kuyil",
+      correctMovie: "Meiyazhagan",
+      correctMovieObj: {
+        title: "Meiyazhagan",
+        // TMDB ID: 270760, poster_path from TMDB for Tamil (Kollywood) Meiyazhagan (1994)
+        poster_path: "/oEqStVMKbOmw3XoaTpK17jS98o4.jpg",
+        id: 270760
+      },
+      choices: [
+        {
+          title: "Meiyazhagan",
+          poster_path: "/oEqStVMKbOmw3XoaTpK17jS98o4.jpg",
+          id: 270760
+        },
+        {
+          title: "Anbe Sivam",
+          poster_path: "/6vAo-VP5NdVs4KJIp4jOSAmhpX6.jpg",
+          id: "fallback2"
+        },
+        {
+          title: "Mouna Ragam",
+          poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg",
+          id: "fallback3"
+        },
+        {
+          title: "Cuckoo",
+          poster_path: "/g7wn2jsdA3zIu1WIn7gkNwHeCWH.jpg",
+          id: 257388
+        }
+      ]
+    },
+    {
+      clue: "Tamizh",
+      correctMovie: "Cuckoo",
+      correctMovieObj: {
+        title: "Cuckoo",
+        // TMDB ID: 257388, poster_path for Tamil (Kollywood) Cuckoo (2014)
+        poster_path: "/g7wn2jsdA3zIu1WIn7gkNwHeCWH.jpg",
+        id: 257388
+      },
+      choices: [
+        {
+          title: "Cuckoo",
+          poster_path: "/g7wn2jsdA3zIu1WIn7gkNwHeCWH.jpg",
+          id: 257388
+        },
+        {
+          title: "Meiyazhagan",
+          poster_path: "/oEqStVMKbOmw3XoaTpK17jS98o4.jpg",
+          id: 270760
+        },
+        {
+          title: "Nayakan",
+          poster_path: "/r6p0JmQUuoAtb5Zs0R2RT7uD3rG.jpg",
+          id: "fallback5"
+        },
+        {
+          title: "Maari",
+          poster_path: "/lfZ9vQqOecL50DJBSNivoobHxPP.jpg",
+          id: "fallback4"
+        }
+      ]
+    },
+    // Third fallback for completeness
+    {
+      clue: "Amaran",
       correctMovie: "Amaran",
       correctMovieObj: {
         title: "Amaran",
@@ -41,77 +105,12 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           id: "fallback3"
         },
         {
-          // Correct Gentleman TMDB Kollywood poster, correct ID
-          title: "Gentleman",
-          poster_path: "/6DTUYTzszbmWzxubUANWkPWWB6E.jpg",
-          id: 97596
-        }
-      ]
-    },
-    {
-      clue: "Muthu",
-      correctMovie: "Muthu",
-      correctMovieObj: {
-        title: "Muthu",
-        poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg", // ID 109007
-        id: 109007
-      },
-      choices: [
-        {
-          title: "Muthu",
-          poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg",
-          id: 109007
-        },
-        {
-          title: "VIP",
-          poster_path: "/gQjF5E3w05QGeeQjRgdvnNZNTKk.jpg",
-          id: 278788
-        },
-        {
-          title: "Anbe Sivam",
-          poster_path: "/6vAo-VP5NdVs4KJIp4jOSAmhpX6.jpg",
-          id: "fallback5"
-        },
-        {
-          title: "Sivaji",
-          poster_path: "/5Lwc5yRvCNr4ieVsgGAaHo9dZYk.jpg",
-          id: "fallback6"
-        }
-      ]
-    },
-    {
-      clue: "Dhanush",
-      correctMovie: "VIP",
-      correctMovieObj: {
-        title: "VIP",
-        poster_path: "/gQjF5E3w05QGeeQjRgdvnNZNTKk.jpg", // ID 278788
-        id: 278788
-      },
-      choices: [
-        {
-          title: "VIP",
-          poster_path: "/gQjF5E3w05QGeeQjRgdvnNZNTKk.jpg",
-          id: 278788
-        },
-        {
-          title: "Gentleman",
-          poster_path: "/6DTUYTzszbmWzxubUANWkPWWB6E.jpg",
-          id: 97596
-        },
-        {
           title: "Maari",
           poster_path: "/lfZ9vQqOecL50DJBSNivoobHxPP.jpg",
-          id: "fallback8"
-        },
-        {
-          title: "Mouna Ragam",
-          poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg",
-          id: "fallback2"
+          id: "fallback4"
         }
       ]
     }
-    // You can add additional static fallback questions here,
-    // but do NOT reference Thillana Mohanambal or use non-Kollywood posters for these titles.
   ];
 
   const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w185";
@@ -140,15 +139,16 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   }
 
   // List of pairs for quiz rounds
+  // Removed VIP and Gentleman, added Meiyazhagan and Cuckoo with unique character pairings.
   const CHARACTER_MOVIE_PAIRS = [
     { character: "Chitti", movie: "Enthiran" },
     { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
     { character: "Velu Naicker", movie: "Nayakan" },
-    { character: "Gentleman", movie: "Gentleman" }, // Ensured correct poster/ID
+    { character: "Kuyil", movie: "Meiyazhagan" },        // Meiyazhagan pairing
+    { character: "Tamizh", movie: "Cuckoo" },            // Cuckoo pairing
     { character: "Muthu", movie: "Muthu" },
     { character: "Maari", movie: "Maari" },
     { character: "Subramani", movie: "Mouna Ragam" },
-    { character: "Dhanush", movie: "VIP" },
     { character: "Nallasivam", movie: "Anbe Sivam" },
     { character: "Rangasamy", movie: "Sivaji" }
   ];
@@ -200,34 +200,33 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }
   }
 
-  // --- Poster overrides for VIP, Gentleman, and Muthu (force correct Kollywood poster path and TMDB ID) ---
-  // These are strictly enforced overrides to always use the authentic TMDB Kollywood posters, never a remake or non-Kollywood version.
-  // VIP (Velaiilla Pattadhari, 2014) - ID: 278788
-  const VIP_OVERRIDE = {
-    title: "VIP",
-    id: 278788,
-    poster_path: "/gQjF5E3w05QGeeQjRgdvnNZNTKk.jpg", // TMDB Kollywood official
+  // --- Poster overrides for Meiyazhagan, Cuckoo, and Muthu only ---
+  // Meiyazhagan (1994) - ID: 270760
+  const MEIYAZHAGAN_OVERRIDE = {
+    title: "Meiyazhagan",
+    id: 270760,
+    poster_path: "/oEqStVMKbOmw3XoaTpK17jS98o4.jpg",
     original_language: "ta",
   };
-  // Gentleman (1993) - ID: 97596
-  const GENTLEMAN_OVERRIDE = {
-    title: "Gentleman",
-    id: 97596,
-    poster_path: "/6DTUYTzszbmWzxubUANWkPWWB6E.jpg", // TMDB Kollywood official
+  // Cuckoo (2014) - ID: 257388
+  const CUCKOO_OVERRIDE = {
+    title: "Cuckoo",
+    id: 257388,
+    poster_path: "/g7wn2jsdA3zIu1WIn7gkNwHeCWH.jpg",
     original_language: "ta",
   };
   // Muthu (Rajinikanth, 1995) - ID: 109007
   const MUTHU_OVERRIDE = {
     title: "Muthu",
     id: 109007,
-    poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg", // TMDB Kollywood official
+    poster_path: "/w1JkfQDANBvXOFW9vDOM1pk2rt9.jpg",
     original_language: "ta",
   };
 
   // Helper: get movie object with poster_path override for specific movies (using correct TMDB ID/poster)
   function getMovieOverrideObj(title) {
-    if (title === "VIP") return { ...VIP_OVERRIDE };
-    if (title === "Gentleman") return { ...GENTLEMAN_OVERRIDE };
+    if (title === "Meiyazhagan") return { ...MEIYAZHAGAN_OVERRIDE };
+    if (title === "Cuckoo") return { ...CUCKOO_OVERRIDE };
     if (title === "Muthu") return { ...MUTHU_OVERRIDE };
     return null;
   }
@@ -245,12 +244,12 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         if (!correctMovieObj) {
           correctMovieObj = await fetchTMDBMovieByTitle(pair.movie);
         }
-        // Enforce overrides for VIP, Gentleman, Muthu: always use correct TMDB data
-        if (pair.movie === "VIP") {
-          correctMovieObj = { ...VIP_OVERRIDE };
+        // Enforce overrides for Meiyazhagan, Cuckoo, and Muthu: always use correct TMDB data
+        if (pair.movie === "Meiyazhagan") {
+          correctMovieObj = { ...MEIYAZHAGAN_OVERRIDE };
         }
-        if (pair.movie === "Gentleman") {
-          correctMovieObj = { ...GENTLEMAN_OVERRIDE };
+        if (pair.movie === "Cuckoo") {
+          correctMovieObj = { ...CUCKOO_OVERRIDE };
         }
         if (pair.movie === "Muthu") {
           correctMovieObj = { ...MUTHU_OVERRIDE };
@@ -260,11 +259,11 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           pair.movie,
           CHOICES_PER_QUESTION - 1
         );
-        // Ensure we never include VIP, Gentleman, or Muthu as a distractor (avoid poster collision)
+        // Ensure we never include Meiyazhagan, Cuckoo, or Muthu as a distractor (avoid poster collision)
         distractorsArr = distractorsArr.filter(
           d => (
             d.title &&
-            !["VIP", "Gentleman", "Muthu"].includes(d.title) &&
+            !["Meiyazhagan", "Cuckoo", "Muthu"].includes(d.title) &&
             d.poster_path
           )
         );
