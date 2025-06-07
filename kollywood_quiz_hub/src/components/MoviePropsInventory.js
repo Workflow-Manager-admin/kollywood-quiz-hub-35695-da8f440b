@@ -1,19 +1,18 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import QuizProgress from "./QuizProgress";
 import QuizResult from "./QuizResult";
+import { tmdbGet, fetchKollywoodMovies } from "../api/tmdb";
 
 /**
  * PUBLIC_INTERFACE
- * MoviePropsInventory — Kollywood-only, 4-emoji/animated icon clues per movie, no poster or title displayed.
- * 
- * - Only uses a hand-curated set of movies and their emoji clues (strictly Kollywood).
- * - Each clue set uses 4 strong visually distinct emoji props.
- * - Strong font color/font-weight styling for clues and input.
+ * MoviePropsInventory — Kollywood-only, 4 prop clues per movie (using TMDB or fallback), no poster or title displayed.
+ * - Where possible, clues are dynamically fetched from TMDB (keywords, objects, genre, etc).
+ * - Falls back to curated static emoji/icon clues if not enough TMDB info is available.
+ * - Each quiz uses a unique set of movies with no repetitions per session.
  */
 function MoviePropsInventory({ onBackToDashboard }) {
-  // Curated Kollywood movies and their prop clues
-  // All clues are emojis with description, 4 per movie
-  const MOVIE_PROP_CLUES = [
+  // Hand-curated fallback movie prop clue set (emojis, Kollywood only)
+  const FALLBACK_PROP_CLUES = [
     {
       answer: "Meiyazhagan",
       clues: [
@@ -117,28 +116,196 @@ function MoviePropsInventory({ onBackToDashboard }) {
 
   const QUESTIONS = 8;
 
-  // Shuffle and select QUESTIONS unique rounds
-  function pickRounds() {
-    let arr = MOVIE_PROP_CLUES.slice();
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr.slice(0, QUESTIONS);
+  // Utility: shuffle a shallow array
+  function shuffle(arr) {
+    return arr
+      .map(x => [x, Math.random()])
+      .sort((a, b) => a[1] - b[1])
+      .map(a => a[0]);
   }
 
-  const [quizRounds] = useState(() => pickRounds());
+  // Tries to extract 4 highly unique/strong prop clues from TMDB movie details
+  // Returns [{label, emoji (sometimes), source}]
+  function tmdbToPropsClues(tmdbMovie, tmdbKeywordsList) {
+    // Extract genres, keywords, notable objects from overview
+    if (!tmdbMovie) return null;
+    let clues = [];
+    // Try genres as first clue
+    if (tmdbMovie.genres && tmdbMovie.genres.length) {
+      clues.push({
+        label: "Genre: " + tmdbMovie.genres[0].name,
+        emoji: null,
+        source: "genre"
+      });
+    }
+    // Use keywords from TMDB
+    if (tmdbKeywordsList && tmdbKeywordsList.length > 0) {
+      // Pick only those that are concrete objects/themes, ignore generic like 'tamil', 'movie', 'love'
+      const IGNORE = ["tamil", "film", "movie", "love", "life", "story", "india", "man", "woman", "music", "song", "family"];
+      const goodKw = tmdbKeywordsList.filter(
+        k => typeof k.name === "string" && k.name.length > 2 && !IGNORE.includes(k.name.toLowerCase())
+      );
+      // Pick up to 2
+      goodKw.slice(0, 2).forEach(kw =>
+        clues.push({
+          label: "Prop: " + kw.name,
+          emoji: null,
+          source: "keyword"
+        })
+      );
+    }
+    // Try picking an object or visual in plot (overview)
+    if (tmdbMovie.overview) {
+      // Example objects to look for
+      const OBJ_PATTERNS = [
+        /ring|gun|cycle|cigar|auto|robot|palace|lion|detective|flag|violin|police|bride|bag|rain|umbrella|snake|horse|pot|money|bacon|tv|electricity|trench coat|turban|slum|strongman|heartbreak|glasses|cane|car|bottle|musician|suitcase/i
+      ];
+      const matches = tmdbMovie.overview.match(OBJ_PATTERNS[0]);
+      if (matches) {
+        clues.push({
+          label: "Object: " + matches[0].charAt(0).toUpperCase() + matches[0].slice(1),
+          emoji: null,
+          source: "overview"
+        });
+      }
+    }
+    // Add release year as last resort only if not yet enough clues
+    if (clues.length < 4 && tmdbMovie.release_date) {
+      clues.push({
+        label: "Year: " + tmdbMovie.release_date.slice(0, 4),
+        emoji: null,
+        source: "release"
+      });
+    }
+    // Only return if at least 3 clues (with at least 2 unique); better fallback when <3
+    // Remove repeats by label
+    clues = clues.filter(
+      (cl, idx, arr) => arr.findIndex(c2 => c2.label === cl.label) === idx
+    );
+    if (clues.length < 3) return null;
+    // Add up to 4 only
+    return clues.slice(0, 4);
+  }
+
+  // Promisified function: Try to fetch TMDB clues for up to n unique Kollywood movies
+  // If enough clues cannot be constructed from TMDB data, fallback to curated
+  async function generatePropRoundsFromTMDB(numRounds) {
+    try {
+      // Use up to 3 discovery pages to ensure variety
+      const allKollywood = [];
+      let page = 1, seenTitles = new Set();
+      // Use discover first, up to 3 pages (60 movies), filter for unique titles
+      while (allKollywood.length < numRounds * 2 && page <= 3) {
+        // Use fetchKollywoodMovies() to get Tamil movies, but it's only 1 page; so use tmdbGet for paged
+        const res = await tmdbGet("/discover/movie", {
+          with_original_language: "ta",
+          sort_by: "popularity.desc",
+          page
+        });
+        if (res && res.results) {
+          res.results.forEach(m => {
+            if (m && m.title && !seenTitles.has(m.title.trim().toLowerCase())) {
+              allKollywood.push(m);
+              seenTitles.add(m.title.trim().toLowerCase());
+            }
+          });
+        }
+        page += 1;
+      }
+      // Shuffle, unique up to numRounds count
+      const pool = shuffle(allKollywood).slice(0, numRounds * 2); // double count for chance
+      const usedTitles = new Set();
+      const rounds = [];
+      // For each, fetch keywords/details, generate up to 4 unique prop clues for this movie
+      for (let i = 0; rounds.length < numRounds && i < pool.length; ++i) {
+        const movie = pool[i];
+        if (!movie || !movie.id || usedTitles.has(movie.title.trim().toLowerCase())) continue;
+        // Fetch keywords and full movie details
+        let tmdbKeywordsList = [];
+        let tmdbDetails = null;
+        try {
+          const [keywordsData, details] = await Promise.all([
+            tmdbGet(`/movie/${movie.id}/keywords`),
+            tmdbGet(`/movie/${movie.id}`, { append_to_response: "genres" })
+          ]);
+          tmdbKeywordsList = keywordsData?.keywords || [];
+          tmdbDetails = {
+            ...movie,
+            genres: details && details.genres ? details.genres : [],
+            overview: details?.overview || movie?.overview || "",
+            release_date: details?.release_date || movie?.release_date || ""
+          };
+        } catch {}
+        // Try to generate prop clues from TMDB data
+        let clues = tmdbToPropsClues(tmdbDetails, tmdbKeywordsList);
+        // If not enough, fallback to hardcoded if present for this movie's title
+        if (!clues || clues.length < 3) {
+          // try to find in fallback
+          const fallback = FALLBACK_PROP_CLUES.find(
+            f => f.answer.toLowerCase() === movie.title.trim().toLowerCase()
+          );
+          if (fallback) {
+            clues = fallback.clues;
+          } else {
+            continue; // skip this movie, not enough clues!
+          }
+        }
+        // Don't allow any movie repeats in a session
+        usedTitles.add(movie.title.trim().toLowerCase());
+        rounds.push({
+          answer: movie.title,
+          clues: clues.map(prop =>
+            prop.emoji
+              ? { ...prop }
+              : { emoji: "", label: prop.label }
+          )
+        });
+      }
+      return rounds.length >= numRounds ? rounds.slice(0, numRounds) : null;
+    } catch {
+      return null; // API error, fallback
+    }
+  }
+
+  // MAIN ROUNDS GENERATION (prefer TMDB, fallback to curated static)
+  const [quizRounds, setQuizRounds] = useState(null);
+  const [tmdbMode, setTmdbMode] = useState(false);
   const [step, setStep] = useState(0);
   const [userInput, setUserInput] = useState("");
   const [userAnswers, setUserAnswers] = useState([]);
   const [showFeedback, setShowFeedback] = useState(null); // {correct, correctTitle}
   const [reveal, setReveal] = useState(false);
   const [quizOver, setQuizOver] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Try TMDB-based rounds first for max accuracy/uniqueness
+    async function bootstrap() {
+      setLoading(true);
+      setTmdbMode(false);
+      const tmdbRounds = await generatePropRoundsFromTMDB(QUESTIONS);
+      if (!cancelled && tmdbRounds && tmdbRounds.length === QUESTIONS) {
+        setQuizRounds(tmdbRounds);
+        setTmdbMode(true);
+        setLoading(false);
+        return;
+      }
+      // fallback: select QUESTIONS unique hand-curated
+      let arr = shuffle(FALLBACK_PROP_CLUES).slice(0, QUESTIONS);
+      setQuizRounds(arr);
+      setTmdbMode(false);
+      setLoading(false);
+    }
+    bootstrap();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line
+  }, []);
 
   // PUBLIC_INTERFACE - Submission handler
   function handleSubmit(e) {
     e.preventDefault();
-    if (!quizRounds[step] || quizOver) return;
+    if (!quizRounds || !quizRounds[step] || quizOver) return;
     const guess = (userInput || "").trim().toLowerCase();
     const correctTitle = quizRounds[step].answer;
     const wasCorrect = guess === correctTitle.toLowerCase();
@@ -158,19 +325,16 @@ function MoviePropsInventory({ onBackToDashboard }) {
 
   // PUBLIC_INTERFACE - Reveal handler
   function handleReveal() {
-    // Reveal mode is now permanent for this round
     setReveal(true);
     const correctTitle = quizRounds[step].answer;
-    setShowFeedback(null); // Ignore old feedback
+    setShowFeedback(null);
     setUserAnswers(prev => [
       ...prev,
       { guess: "", correct: correctTitle, wasCorrect: false, revealed: true }
     ]);
-    // Do not autosubmit or proceed, just reveal and lock
-    // Don't allow guessing or submit for this step now
   }
 
-  // Render the prop clue box for 4 strong-styled emoji clues
+  // Render the prop clue box for 4 strong-styled clues (emojis or text)
   function renderPropClues(clues) {
     if (!clues || clues.length < 1) return null;
     return (
@@ -187,7 +351,7 @@ function MoviePropsInventory({ onBackToDashboard }) {
       >
         {clues.map((c, i) => (
           <div
-            key={c.emoji + i}
+            key={(c.emoji || c.label || "") + i}
             style={{
               background: "linear-gradient(120deg, #ffe54c 70%, #25b6e6 130%)",
               border: "3px solid #12cbac",
@@ -207,7 +371,7 @@ function MoviePropsInventory({ onBackToDashboard }) {
               position: "relative"
             }}
             tabIndex={0}
-            aria-label={"Clue: " + c.label}
+            aria-label={"Clue: " + (c.label || "")}
           >
             <span
               style={{
@@ -219,7 +383,7 @@ function MoviePropsInventory({ onBackToDashboard }) {
               aria-label={c.label}
               role="img"
             >
-              {c.emoji}
+              {c.emoji || ""}
             </span>
             <span
               style={{
@@ -239,6 +403,12 @@ function MoviePropsInventory({ onBackToDashboard }) {
     );
   }
 
+  if (loading || !quizRounds)
+    return (
+      <div className="container" style={{ paddingTop: 120, color: "#ffe600" }}>
+        Loading unique Kollywood movie prop clues...
+      </div>
+    );
   if (quizOver)
     return (
       <QuizResult
