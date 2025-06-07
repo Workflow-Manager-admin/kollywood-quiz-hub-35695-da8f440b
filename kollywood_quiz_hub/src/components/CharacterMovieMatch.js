@@ -45,7 +45,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         }
       ]
     },
-    // ...remaining fallback entries are unchanged for brevity, see prompt for details...
+    // ...remaining fallback entries unchanged for brevity...
     {
       clue: "Anbuchelvan IPS",
       correctMovie: "Kaakha Kaakha",
@@ -342,7 +342,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   const [reveal, setReveal] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
 
-  // Character/movie pool (not needed except for dynamic building, kept here for clarity/expandability)
+  // Character/movie pool (for API mode)
   const CHARACTER_MOVIE_PAIRS = [
     { character: "Chitti", movie: "Enthiran" },
     { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
@@ -354,7 +354,6 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Dhanush", movie: "VIP" },
     { character: "Nallasivam", movie: "Anbe Sivam" },
     { character: "Rangasamy", movie: "Sivaji" }
-    // Add more if needed
   ];
 
   // On mount, fetch and build quiz. Fallback for missing posters/data.
@@ -383,7 +382,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           .filter(Boolean)
           .slice(0, QUESTIONS);
 
-        // Diagnostics
+        // Diagnostics (console logging for debugging poster URLs)
         if (window?.console) {
           if (withPosters.length < 15) {
             console.warn("[CharacterMovieMatch] Low movie poster pool from API:", withPosters.length);
@@ -424,7 +423,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       });
   }, []);
 
-  // Drag and drop logic for character clues
+  // Drag and drop logic (drag clue to poster)
   function handleDragStart() {
     setDraggedClue(questions[step]);
     setDragActive(true);
@@ -468,7 +467,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }, 450);
   }
 
-  // Reveal behavior (treat as "give up")
+  // Reveal/give up behavior
   function handleReveal() {
     setReveal(true);
     setUserAnswers(prev => [
@@ -488,7 +487,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }, 1800);
   }
 
-  // ---- UI render logic ----
+  // --- UI Render Logic ---
 
   if (loading) {
     return (
@@ -508,8 +507,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
       />
     );
   }
-
-  // If no valid question, fallback round fallback UI just in case (shouldn't happen)
+  // Defensive fallback: if no valid question (should never happen)
   if (!questions[step]) {
     const fb = FALLBACK_QUESTIONS[0];
     return (
@@ -548,94 +546,99 @@ function CharacterMovieMatch({ onBackToDashboard }) {
               justifyContent: "center",
               flexWrap: "wrap"
             }}>
-            {fb.choices.map((movieObj, idx) => (
-              <div
-                key={movieObj.id || idx}
-                style={{
-                  background: "#f7faff",
-                  minWidth: 130,
-                  minHeight: 210,
-                  border: movieObj.title === fb.correctMovie ? "3px solid #2acd86" : "2px solid #bae8f7",
-                  borderRadius: 12,
-                  alignItems: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-start",
-                  fontSize: 19,
-                  color: "#111",
-                  fontWeight: 500,
-                  margin: 6,
-                  boxShadow: "0 3px 10px #ecf2fb"
-                }}
-                tabIndex={0}
-                aria-label={`Demo poster for ${movieObj.title}`}>
-                {movieObj.poster_path ? (
-                  <img
-                    src={`${TMDB_IMAGE_BASE}${movieObj.poster_path}`}
-                    alt={movieObj.title ? `Poster for ${movieObj.title}` : "Movie Poster"}
+            {fb.choices && fb.choices.length > 0 && (
+              <>
+                {fb.choices.map((movieObj, idx) => (
+                  <div
+                    key={movieObj.id || idx}
                     style={{
-                      width: "110px",
-                      height: "160px",
-                      borderRadius: 7,
-                      objectFit: "cover",
-                      boxShadow: "0 4px 16px #b3d5ef33",
-                      marginTop: 14,
-                      marginBottom: 8,
-                      border: "2px solid #cbeef3",
-                      background: "#ebf5fb"
+                      background: "#f7faff",
+                      minWidth: 130,
+                      minHeight: 210,
+                      border: movieObj.title === fb.correctMovie ? "3px solid #2acd86" : "2px solid #bae8f7",
+                      borderRadius: 12,
+                      alignItems: "center",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "flex-start",
+                      fontSize: 19,
+                      color: "#111",
+                      fontWeight: 500,
+                      margin: 6,
+                      boxShadow: "0 3px 10px #ecf2fb"
                     }}
-                    loading="lazy"
-                    onError={e => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.style.display = "none";
-                      // fallback
-                      const fallbackDiv = document.createElement("div");
-                      fallbackDiv.textContent = "Poster Unavailable";
-                      fallbackDiv.style.width = "110px";
-                      fallbackDiv.style.height = "160px";
-                      fallbackDiv.style.background = "#d3e0ea";
-                      fallbackDiv.style.borderRadius = "6px";
-                      fallbackDiv.style.marginTop = "14px";
-                      fallbackDiv.style.display = "flex";
-                      fallbackDiv.style.alignItems = "center";
-                      fallbackDiv.style.justifyContent = "center";
-                      fallbackDiv.style.color = "#678";
-                      fallbackDiv.style.fontSize = "12px";
-                      fallbackDiv.style.fontWeight = "500";
-                      e.currentTarget.parentNode.appendChild(fallbackDiv);
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: 110, height: 160, background: "#d3e0ea",
-                    borderRadius: 6, marginTop: 14,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#678", fontSize: 12, fontWeight: 500
-                  }}>
-                    No Poster
+                    tabIndex={0}
+                    aria-label={`Demo poster for ${movieObj.title}`}
+                  >
+                    {movieObj.poster_path ? (
+                      <img
+                        src={`${TMDB_IMAGE_BASE}${movieObj.poster_path}`}
+                        alt={movieObj.title ? `Poster for ${movieObj.title}` : "Movie Poster"}
+                        style={{
+                          width: "110px",
+                          height: "160px",
+                          borderRadius: 7,
+                          objectFit: "cover",
+                          boxShadow: "0 4px 16px #b3d5ef33",
+                          marginTop: 14,
+                          marginBottom: 8,
+                          border: "2px solid #cbeef3",
+                          background: "#ebf5fb"
+                        }}
+                        loading="lazy"
+                        onError={e => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.style.display = "none";
+                          // fallback
+                          const fallbackDiv = document.createElement("div");
+                          fallbackDiv.textContent = "Poster Unavailable";
+                          fallbackDiv.style.width = "110px";
+                          fallbackDiv.style.height = "160px";
+                          fallbackDiv.style.background = "#d3e0ea";
+                          fallbackDiv.style.borderRadius = "6px";
+                          fallbackDiv.style.marginTop = "14px";
+                          fallbackDiv.style.display = "flex";
+                          fallbackDiv.style.alignItems = "center";
+                          fallbackDiv.style.justifyContent = "center";
+                          fallbackDiv.style.color = "#678";
+                          fallbackDiv.style.fontSize = "12px";
+                          fallbackDiv.style.fontWeight = "500";
+                          e.currentTarget.parentNode.appendChild(fallbackDiv);
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: 110, height: 160, background: "#d3e0ea",
+                        borderRadius: 6, marginTop: 14,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "#678", fontSize: 12, fontWeight: 500
+                      }}>
+                        No Poster
+                      </div>
+                    )}
+                    <div style={{
+                      marginTop: 4, textAlign: "center", fontWeight: 600, fontSize: 16,
+                      width: 120, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      userSelect: "none", background: "rgba(245,250,250, 0.8)", borderRadius: 6, padding: "4px 0"
+                    }}>
+                      {movieObj.title}
+                    </div>
+                    {movieObj.title === fb.correctMovie && (
+                      <span style={{
+                        position: "absolute", right: 10, top: 10, fontSize: 32, color: "#2acd86"
+                      }}>✔️</span>
+                    )}
                   </div>
-                )}
-                <div style={{
-                  marginTop: 4, textAlign: "center", fontWeight: 600, fontSize: 16,
-                  width: 120, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                  userSelect: "none", background: "rgba(245,250,250, 0.8)", borderRadius: 6, padding: "4px 0"
-                }}>
-                  {movieObj.title}
-                </div>
-                {movieObj.title === fb.correctMovie && (
-                  <span style={{
-                    position: "absolute", right: 10, top: 10, fontSize: 32, color: "#2acd86"
-                  }}>✔️</span>
-                )}
-              </div>
-            ))}
+                ))}
+              </>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  // NORMAL ROUND RENDER
+  // Normal round UI
   const question = questions[step];
 
   return (
@@ -705,126 +708,130 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             pointerEvents: reveal ? "none" : "auto"
           }}
         >
-          {question.choices.map((movieObj, idx) => {
-            // Log the image/poster info always for diagnostics
-            if (window?.console) {
-              console.log(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}]`, {
-                title: movieObj.title,
-                poster_path: movieObj.poster_path,
-                TMDB_IMAGE_BASE,
-                url: movieObj.poster_path ? `${TMDB_IMAGE_BASE}${movieObj.poster_path}` : null,
-              });
-              if (!movieObj.poster_path)
-                console.warn(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}] poster_path missing`, movieObj);
-            }
-            return (
-              <div
-                key={movieObj.id || idx}
-                onDrop={e => handleDropOnPoster(movieObj, idx, e)}
-                onDragOver={allowDrop}
-                onDragLeave={leaveDrop}
-                style={{
-                  background: "#f7faff",
-                  minWidth: 130,
-                  minHeight: 210,
-                  border: answeredIdx === idx
-                    ? (movieObj.title === question.correctMovie ? "3px solid #2acd86" : "3px solid #da364a")
-                    : "2px solid #bae8f7",
-                  borderRadius: 12,
-                  alignItems: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-start",
-                  fontSize: 19,
-                  color: "#111",
-                  fontWeight: 500,
-                  margin: 6,
-                  cursor: dragActive && !reveal ? "pointer" : "default",
-                  boxShadow: answeredIdx === idx
-                    ? (movieObj.title === question.correctMovie ? "0 0 18px #49f1b7" : "0 0 14px #ffb2bc")
-                    : "0 3px 10px #ecf2fb",
-                  opacity: dragActive ? 0.93 : 1,
-                  position: "relative",
-                  transition: "box-shadow 0.25s, border 0.21s, opacity 0.12s"
-                }}
-                tabIndex={0}
-                aria-label={`Drop character here for ${movieObj.title}`}
-              >
-                {movieObj.poster_path ? (
-                  <img
-                    src={`${TMDB_IMAGE_BASE}${movieObj.poster_path}`}
-                    alt={movieObj.title ? `Poster for ${movieObj.title}` : "Movie Poster"}
+          {question.choices && question.choices.length > 0 && (
+            <>
+              {question.choices.map((movieObj, idx) => {
+                // Log the image/poster info always for diagnostics
+                if (window?.console) {
+                  console.log(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}]`, {
+                    title: movieObj.title,
+                    poster_path: movieObj.poster_path,
+                    TMDB_IMAGE_BASE,
+                    url: movieObj.poster_path ? `${TMDB_IMAGE_BASE}${movieObj.poster_path}` : null,
+                  });
+                  if (!movieObj.poster_path)
+                    console.warn(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}] poster_path missing`, movieObj);
+                }
+                return (
+                  <div
+                    key={movieObj.id || idx}
+                    onDrop={e => handleDropOnPoster(movieObj, idx, e)}
+                    onDragOver={allowDrop}
+                    onDragLeave={leaveDrop}
                     style={{
-                      width: "110px",
-                      height: "160px",
-                      borderRadius: 7,
-                      objectFit: "cover",
-                      boxShadow: "0 4px 16px #b3d5ef33",
-                      marginTop: 14,
-                      marginBottom: 8,
-                      border: "2px solid #cbeef3",
-                      background: "#ebf5fb"
+                      background: "#f7faff",
+                      minWidth: 130,
+                      minHeight: 210,
+                      border: answeredIdx === idx
+                        ? (movieObj.title === question.correctMovie ? "3px solid #2acd86" : "3px solid #da364a")
+                        : "2px solid #bae8f7",
+                      borderRadius: 12,
+                      alignItems: "center",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "flex-start",
+                      fontSize: 19,
+                      color: "#111",
+                      fontWeight: 500,
+                      margin: 6,
+                      cursor: dragActive && !reveal ? "pointer" : "default",
+                      boxShadow: answeredIdx === idx
+                        ? (movieObj.title === question.correctMovie ? "0 0 18px #49f1b7" : "0 0 14px #ffb2bc")
+                        : "0 3px 10px #ecf2fb",
+                      opacity: dragActive ? 0.93 : 1,
+                      position: "relative",
+                      transition: "box-shadow 0.25s, border 0.21s, opacity 0.12s"
                     }}
-                    loading="lazy"
-                    onError={e => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.style.display = "none";
-                      const fallbackDiv = document.createElement("div");
-                      fallbackDiv.textContent = "Poster Unavailable";
-                      fallbackDiv.style.width = "110px";
-                      fallbackDiv.style.height = "160px";
-                      fallbackDiv.style.background = "#d3e0ea";
-                      fallbackDiv.style.borderRadius = "6px";
-                      fallbackDiv.style.marginTop = "14px";
-                      fallbackDiv.style.display = "flex";
-                      fallbackDiv.style.alignItems = "center";
-                      fallbackDiv.style.justifyContent = "center";
-                      fallbackDiv.style.color = "#678";
-                      fallbackDiv.style.fontSize = "12px";
-                      fallbackDiv.style.fontWeight = "500";
-                      e.currentTarget.parentNode.appendChild(fallbackDiv);
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: 110, height: 160, background: "#d3e0ea",
-                    borderRadius: 6, marginTop: 14,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#678", fontSize: 12, fontWeight: 500
-                  }}>
-                    No Poster
+                    tabIndex={0}
+                    aria-label={`Drop character here for ${movieObj.title}`}
+                  >
+                    {movieObj.poster_path ? (
+                      <img
+                        src={`${TMDB_IMAGE_BASE}${movieObj.poster_path}`}
+                        alt={movieObj.title ? `Poster for ${movieObj.title}` : "Movie Poster"}
+                        style={{
+                          width: "110px",
+                          height: "160px",
+                          borderRadius: 7,
+                          objectFit: "cover",
+                          boxShadow: "0 4px 16px #b3d5ef33",
+                          marginTop: 14,
+                          marginBottom: 8,
+                          border: "2px solid #cbeef3",
+                          background: "#ebf5fb"
+                        }}
+                        loading="lazy"
+                        onError={e => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.style.display = "none";
+                          const fallbackDiv = document.createElement("div");
+                          fallbackDiv.textContent = "Poster Unavailable";
+                          fallbackDiv.style.width = "110px";
+                          fallbackDiv.style.height = "160px";
+                          fallbackDiv.style.background = "#d3e0ea";
+                          fallbackDiv.style.borderRadius = "6px";
+                          fallbackDiv.style.marginTop = "14px";
+                          fallbackDiv.style.display = "flex";
+                          fallbackDiv.style.alignItems = "center";
+                          fallbackDiv.style.justifyContent = "center";
+                          fallbackDiv.style.color = "#678";
+                          fallbackDiv.style.fontSize = "12px";
+                          fallbackDiv.style.fontWeight = "500";
+                          e.currentTarget.parentNode.appendChild(fallbackDiv);
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: 110, height: 160, background: "#d3e0ea",
+                        borderRadius: 6, marginTop: 14,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "#678", fontSize: 12, fontWeight: 500
+                      }}>
+                        No Poster
+                      </div>
+                    )}
+                    <div style={{
+                      marginTop: 4,
+                      textAlign: "center",
+                      fontWeight: 600,
+                      fontSize: 16,
+                      width: 120,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      userSelect: "none",
+                      background: "rgba(245,250,250, 0.8)",
+                      borderRadius: 6,
+                      padding: "4px 0"
+                    }}>
+                      {movieObj.title}
+                    </div>
+                    {answeredIdx === idx && (
+                      <span style={{
+                        position: "absolute",
+                        right: 10,
+                        top: 10,
+                        fontSize: 32,
+                        color: movieObj.title === question.correctMovie ? "#2acd86" : "#ed2e40"
+                      }}>
+                        {movieObj.title === question.correctMovie ? "✔️" : "✖️"}
+                      </span>
+                    )}
                   </div>
-                )}
-                <div style={{
-                  marginTop: 4,
-                  textAlign: "center",
-                  fontWeight: 600,
-                  fontSize: 16,
-                  width: 120,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  userSelect: "none",
-                  background: "rgba(245,250,250, 0.8)",
-                  borderRadius: 6,
-                  padding: "4px 0"
-                }}>
-                  {movieObj.title}
-                </div>
-                {answeredIdx === idx && (
-                  <span style={{
-                    position: "absolute",
-                    right: 10,
-                    top: 10,
-                    fontSize: 32,
-                    color: movieObj.title === question.correctMovie ? "#2acd86" : "#ed2e40"
-                  }}>
-                    {movieObj.title === question.correctMovie ? "✔️" : "✖️"}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </>
+          )}
         </div>
         <button
           className="btn"
