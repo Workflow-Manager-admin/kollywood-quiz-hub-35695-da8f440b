@@ -79,7 +79,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Velu Naicker", movie: "Nayakan" },
     // Ensure "Gentleman" round uses correct TMDB data
     { character: "Gentleman", movie: "Gentleman" },
-    // Replacing 'Thillana Mohanambal' with 'Muthu' (with TMDB ID 109007)
+    // Use Muthu (ID 109007), no reference to Thillana Mohanambal anywhere
     { character: "Muthu", movie: "Muthu" },
     { character: "Maari", movie: "Maari" },
     { character: "Subramani", movie: "Mouna Ragam" },
@@ -136,41 +136,41 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }
   }
 
+  // --- Poster overrides for VIP and Gentleman (and Muthu for consistency) ---
+  // These are enforced because TMDB can sometimes show a non-Kollywood or blank poster.
+  // VIP (Velaiilla Pattadhari, 2014) - ID: 278788
+  const VIP_OVERRIDE = {
+    title: "VIP",
+    id: 278788,
+    poster_path: "/t6MZAuT9x6nEnv7t9MkRUgyw35E.jpg", // TMDB (Kollywood), hardcoded fallback
+    original_language: "ta",
+  };
+  // Gentleman (1993) - ID: 97596
+  const GENTLEMAN_OVERRIDE = {
+    title: "Gentleman",
+    id: 97596,
+    poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg", // TMDB (Kollywood)
+    original_language: "ta",
+  };
+  // Muthu (Rajinikanth, 1995) - ID: 109007
+  const MUTHU_OVERRIDE = {
+    title: "Muthu",
+    id: 109007,
+    poster_path: "/qBW0rUHkAxe6G0OBHuZRL4pEruM.jpg", // TMDB (Kollywood)
+    original_language: "ta",
+  };
+
+  // Helper: get movie object with poster_path override for specific movies (using correct TMDB ID/poster)
+  function getMovieOverrideObj(title) {
+    if (title === "VIP") return { ...VIP_OVERRIDE };
+    if (title === "Gentleman") return { ...GENTLEMAN_OVERRIDE };
+    if (title === "Muthu") return { ...MUTHU_OVERRIDE };
+    return null;
+  }
+
   // MAIN QUIZ ROUND BUILDER
   useEffect(() => {
     let cancelled = false;
-
-    // --- Poster overrides for VIP and Gentleman (and Muthu for consistency) ---
-    // Sourced from official TMDB:
-    // VIP (Velaiilla Pattadhari, 2014) - ID: 278788
-    const VIP_OVERRIDE = {
-      title: "VIP",
-      id: 278788,
-      poster_path: "/t6MZAuT9x6nEnv7t9MkRUgyw35E.jpg", // TMDB (Kollywood)
-      original_language: "ta",
-    };
-    // Gentleman (1993) - ID: 97596
-    const GENTLEMAN_OVERRIDE = {
-      title: "Gentleman",
-      id: 97596,
-      poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg", // TMDB (Kollywood)
-      original_language: "ta",
-    };
-    // Muthu (Rajinikanth, 1995) - ID: 109007
-    const MUTHU_OVERRIDE = {
-      title: "Muthu",
-      id: 109007,
-      poster_path: "/qBW0rUHkAxe6G0OBHuZRL4pEruM.jpg", // TMDB (Kollywood)
-      original_language: "ta",
-    };
-
-    // Helper: get movie object with poster_path override for specific movies (using correct TMDB ID/poster)
-    function getMovieOverrideObj(title) {
-      if (title === "VIP") return { ...VIP_OVERRIDE };
-      if (title === "Gentleman") return { ...GENTLEMAN_OVERRIDE };
-      if (title === "Muthu") return { ...MUTHU_OVERRIDE };
-      return null;
-    }
 
     async function prepareRounds() {
       setLoading(true);
