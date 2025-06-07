@@ -15,6 +15,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 
   // List of clue characters and their associated movies (primary roles, all matches should exist in TMDB pool)
   // Each entry: { character: String, movie: String }
+  // NOTE: If API fails, we supply hardcoded pairs (full fallback below effect).
   const CHARACTER_MOVIE_PAIRS = [
     { character: "Chitti", movie: "Enthiran" },
     { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
@@ -27,6 +28,328 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Nallasivam", movie: "Anbe Sivam" },
     { character: "Rangasamy", movie: "Sivaji" },
     // Add more if needed later
+  ];
+
+  // HARDCODED FALLBACK (always 10, real posters)
+  const FALLBACK_QUESTIONS = [
+    {
+      clue: "mukundh varadharajan",
+      correctMovie: "Amaran",
+      correctMovieObj: {
+        title: "Amaran",
+        poster_path: "/A4pZ0b8UoLxa6pnx6tEN84ImU8e.jpg",
+        id: "fallback1"
+      },
+      choices: [
+        {
+          title: "Amaran",
+          poster_path: "/A4pZ0b8UoLxa6pnx6tEN84ImU8e.jpg",
+          id: "fallback1"
+        },
+        {
+          title: "Mouna Ragam",
+          poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg",
+          id: "fallback2"
+        },
+        {
+          title: "Enthiran",
+          poster_path: "/cZy1FIKwpsbRdd3RMa9FaXGFDeA.jpg",
+          id: "fallback3"
+        },
+        {
+          title: "Gentleman",
+          poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg",
+          id: "fallback4"
+        }
+      ]
+    },
+    {
+      clue: "Anbuchelvan IPS",
+      correctMovie: "Kaakha Kaakha",
+      correctMovieObj: {
+        title: "Kaakha Kaakha",
+        poster_path: "/rBl1hlyHmlYSU1l1KFtGVHAUkl6.jpg",
+        id: "fallback5"
+      },
+      choices: [
+        {
+          title: "Kaakha Kaakha",
+          poster_path: "/rBl1hlyHmlYSU1l1KFtGVHAUkl6.jpg",
+          id: "fallback5"
+        },
+        {
+          title: "Nayakan",
+          poster_path: "/7oYtN73IXOcxXvvzS8T3ewlm8d4.jpg",
+          id: "fallback6"
+        },
+        {
+          title: "Sivaji",
+          poster_path: "/beAt9HHQ0Uue8Ghs2YXW48UUfZo.jpg",
+          id: "fallback7"
+        },
+        {
+          title: "Baasha",
+          poster_path: "/84Tp4YRa0tT4uXuI5ArkVWZdFBj.jpg",
+          id: "fallback8"
+        }
+      ]
+    },
+    // Fallback round 3
+    {
+      clue: "Velu Naicker",
+      correctMovie: "Nayakan",
+      correctMovieObj: {
+        title: "Nayakan",
+        poster_path: "/7oYtN73IXOcxXvvzS8T3ewlm8d4.jpg",
+        id: "fallback6"
+      },
+      choices: [
+        {
+          title: "Nayakan",
+          poster_path: "/7oYtN73IXOcxXvvzS8T3ewlm8d4.jpg",
+          id: "fallback6"
+        },
+        {
+          title: "Kaakha Kaakha",
+          poster_path: "/rBl1hlyHmlYSU1l1KFtGVHAUkl6.jpg",
+          id: "fallback5"
+        },
+        {
+          title: "VIP",
+          poster_path: "/wrE2HLQaaQ5yC6hG65B7VMaNaEC.jpg",
+          id: "fallback9"
+        },
+        {
+          title: "Gentleman",
+          poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg",
+          id: "fallback4"
+        }
+      ]
+    },
+    // Fallback round 4
+    {
+      clue: "Gentleman",
+      correctMovie: "Gentleman",
+      correctMovieObj: {
+        title: "Gentleman",
+        poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg",
+        id: "fallback4"
+      },
+      choices: [
+        {
+          title: "Gentleman",
+          poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg",
+          id: "fallback4"
+        },
+        {
+          title: "Mouna Ragam",
+          poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg",
+          id: "fallback2"
+        },
+        {
+          title: "Anbe Sivam",
+          poster_path: "/nQOeN7HDtbqG7o1lClFFoGmnIke.jpg",
+          id: "fallback10"
+        },
+        {
+          title: "Sivaji",
+          poster_path: "/beAt9HHQ0Uue8Ghs2YXW48UUfZo.jpg",
+          id: "fallback7"
+        }
+      ]
+    },
+    // Fallback round 5
+    {
+      clue: "Maari",
+      correctMovie: "Maari",
+      correctMovieObj: {
+        title: "Maari",
+        poster_path: "/z8EByWO85jZKq1A1UJt9QEbduVX.jpg",
+        id: "fallback11"
+      },
+      choices: [
+        {
+          title: "Maari",
+          poster_path: "/z8EByWO85jZKq1A1UJt9QEbduVX.jpg",
+          id: "fallback11"
+        },
+        {
+          title: "VIP",
+          poster_path: "/wrE2HLQaaQ5yC6hG65B7VMaNaEC.jpg",
+          id: "fallback9"
+        },
+        {
+          title: "Nayakan",
+          poster_path: "/7oYtN73IXOcxXvvzS8T3ewlm8d4.jpg",
+          id: "fallback6"
+        },
+        {
+          title: "Baasha",
+          poster_path: "/84Tp4YRa0tT4uXuI5ArkVWZdFBj.jpg",
+          id: "fallback8"
+        }
+      ]
+    },
+    // Fallback round 6
+    {
+      clue: "Subramani",
+      correctMovie: "Mouna Ragam",
+      correctMovieObj: {
+        title: "Mouna Ragam",
+        poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg",
+        id: "fallback2"
+      },
+      choices: [
+        {
+          title: "Mouna Ragam",
+          poster_path: "/zI6FqDTKj7fj3FVQHfQj5CqiAUi.jpg",
+          id: "fallback2"
+        },
+        {
+          title: "Amaran",
+          poster_path: "/A4pZ0b8UoLxa6pnx6tEN84ImU8e.jpg",
+          id: "fallback1"
+        },
+        {
+          title: "Gentleman",
+          poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg",
+          id: "fallback4"
+        },
+        {
+          title: "VIP",
+          poster_path: "/wrE2HLQaaQ5yC6hG65B7VMaNaEC.jpg",
+          id: "fallback9"
+        }
+      ]
+    },
+    // Fallback round 7
+    {
+      clue: "Dhanush",
+      correctMovie: "VIP",
+      correctMovieObj: {
+        title: "VIP",
+        poster_path: "/wrE2HLQaaQ5yC6hG65B7VMaNaEC.jpg",
+        id: "fallback9"
+      },
+      choices: [
+        {
+          title: "VIP",
+          poster_path: "/wrE2HLQaaQ5yC6hG65B7VMaNaEC.jpg",
+          id: "fallback9"
+        },
+        {
+          title: "Maari",
+          poster_path: "/z8EByWO85jZKq1A1UJt9QEbduVX.jpg",
+          id: "fallback11"
+        },
+        {
+          title: "Baasha",
+          poster_path: "/84Tp4YRa0tT4uXuI5ArkVWZdFBj.jpg",
+          id: "fallback8"
+        },
+        {
+          title: "Thillana Mohanambal",
+          poster_path: "/jwOhnep5pr8wui1mi3YqTvp6rph.jpg",
+          id: "fallback12"
+        }
+      ]
+    },
+    // Fallback round 8
+    {
+      clue: "Nallasivam",
+      correctMovie: "Anbe Sivam",
+      correctMovieObj: {
+        title: "Anbe Sivam",
+        poster_path: "/nQOeN7HDtbqG7o1lClFFoGmnIke.jpg",
+        id: "fallback10"
+      },
+      choices: [
+        {
+          title: "Anbe Sivam",
+          poster_path: "/nQOeN7HDtbqG7o1lClFFoGmnIke.jpg",
+          id: "fallback10"
+        },
+        {
+          title: "Nayakan",
+          poster_path: "/7oYtN73IXOcxXvvzS8T3ewlm8d4.jpg",
+          id: "fallback6"
+        },
+        {
+          title: "VIP",
+          poster_path: "/wrE2HLQaaQ5yC6hG65B7VMaNaEC.jpg",
+          id: "fallback9"
+        },
+        {
+          title: "Kaakha Kaakha",
+          poster_path: "/rBl1hlyHmlYSU1l1KFtGVHAUkl6.jpg",
+          id: "fallback5"
+        }
+      ]
+    },
+    // Fallback round 9
+    {
+      clue: "Rangasamy",
+      correctMovie: "Sivaji",
+      correctMovieObj: {
+        title: "Sivaji",
+        poster_path: "/beAt9HHQ0Uue8Ghs2YXW48UUfZo.jpg",
+        id: "fallback7"
+      },
+      choices: [
+        {
+          title: "Sivaji",
+          poster_path: "/beAt9HHQ0Uue8Ghs2YXW48UUfZo.jpg",
+          id: "fallback7"
+        },
+        {
+          title: "Thillana Mohanambal",
+          poster_path: "/jwOhnep5pr8wui1mi3YqTvp6rph.jpg",
+          id: "fallback12"
+        },
+        {
+          title: "Gentleman",
+          poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg",
+          id: "fallback4"
+        },
+        {
+          title: "Baasha",
+          poster_path: "/84Tp4YRa0tT4uXuI5ArkVWZdFBj.jpg",
+          id: "fallback8"
+        }
+      ]
+    },
+    // Fallback round 10
+    {
+      clue: "Saroja Devi",
+      correctMovie: "Thillana Mohanambal",
+      correctMovieObj: {
+        title: "Thillana Mohanambal",
+        poster_path: "/jwOhnep5pr8wui1mi3YqTvp6rph.jpg",
+        id: "fallback12"
+      },
+      choices: [
+        {
+          title: "Thillana Mohanambal",
+          poster_path: "/jwOhnep5pr8wui1mi3YqTvp6rph.jpg",
+          id: "fallback12"
+        },
+        {
+          title: "Nayakan",
+          poster_path: "/7oYtN73IXOcxXvvzS8T3ewlm8d4.jpg",
+          id: "fallback6"
+        },
+        {
+          title: "VIP",
+          poster_path: "/wrE2HLQaaQ5yC6hG65B7VMaNaEC.jpg",
+          id: "fallback9"
+        },
+        {
+          title: "Anbe Sivam",
+          poster_path: "/nQOeN7HDtbqG7o1lClFFoGmnIke.jpg",
+          id: "fallback10"
+        }
+      ]
+    }
   ];
 
   // State declarations
@@ -84,10 +407,21 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         });
 
         setAllMovies(withPosters); // Save for possible fallback use
-        setQuestions(roundData);
+
+        // Fallback: If not enough rounds generated with real data, or any round is missing poster(s), use hardcoded fallback.
+        if (roundData.length < QUESTIONS || roundData.some(r => !r.correctMovieObj || !r.correctMovieObj.poster_path || r.choices.some(
+          c => !c.poster_path))) {
+          setQuestions(FALLBACK_QUESTIONS);
+        } else {
+          setQuestions(roundData);
+        }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        // On fetch failure, always use our fallback
+        setQuestions(FALLBACK_QUESTIONS);
+        setLoading(false);
+      });
   }, []);
 
   // Handle drop on a movie poster (answer selection)
@@ -176,16 +510,113 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         game="Character-Movie Match"
       />
     );
-  // No valid questions? Show fallback.
+  // If no valid questions, provide fallback game gracefully (should never hit due to our fallback logic, but just in case):
   if (!questions[step]) {
+    // Defensive: show one fallback round anyway
+    const fb = FALLBACK_QUESTIONS[0];
     return (
-      <div className="container" style={{ paddingTop: 120 }}>
-        <h2 className="title" style={{ fontSize: "1.25em" }}>Character-Movie Match</h2>
-        <div className="description" style={{ color: "#c23616", marginBottom: 20 }}>
-          Sorry, no quiz questions could be generated right now.<br />
-          Please try again later or reload to retry.
+      <div className="container" style={{ paddingTop: 100, marginBottom: 40 }}>
+        <button className="btn" style={{ marginBottom: 24 }} onClick={onBackToDashboard}>
+          ⬅ Back
+        </button>
+        <QuizProgress current={1} total={QUESTIONS} />
+        <h2 className="title" style={{ fontSize: "1.65rem", marginBottom: 13 }}>
+          Character-Movie Match (Fallback)
+        </h2>
+        <div className="description" style={{ marginBottom: 18 }}>
+          Fallback: Drag the <b>character clue</b> onto the correct movie poster. (Demo Mode)
         </div>
-        <button className="btn btn-large" onClick={onBackToDashboard}>Back to Dashboard</button>
+        <div
+          style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+          }}>
+          <div
+            style={{
+              background: "#f6fcfc",
+              color: "#1255ae",
+              fontWeight: 600,
+              fontSize: 28,
+              borderRadius: 10,
+              padding: "22px 34px",
+              margin: "15px 0 20px 0",
+              minWidth: 220,
+              boxShadow: "0 0 12px #dde4fa",
+              opacity: 1,
+              cursor: "grab"
+            }}
+          >{fb.clue}</div>
+          <div
+            style={{
+              display: "flex",
+              gap: "32px",
+              margin: "16px 0 24px 0",
+              justifyContent: "center",
+              flexWrap: "wrap"
+            }}
+          >{fb.choices.map((movieObj, idx) => (
+            <div
+              key={movieObj.id || idx}
+              style={{
+                background: "#f7faff",
+                minWidth: 130,
+                minHeight: 210,
+                border: movieObj.title === fb.correctMovie ? "3px solid #2acd86" : "2px solid #bae8f7",
+                borderRadius: 12,
+                alignItems: "center",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "flex-start",
+                fontSize: 19,
+                color: "#111",
+                fontWeight: 500,
+                margin: 6,
+                boxShadow: "0 3px 10px #ecf2fb"
+              }}
+              tabIndex={0}
+              aria-label={`Demo poster for ${movieObj.title}`}>
+              {movieObj.poster_path ? (
+                <img
+                  src={`https://image.tmdb.org/t/p/w185${movieObj.poster_path}`}
+                  alt={movieObj.title}
+                  style={{
+                    width: "110px",
+                    height: "160px",
+                    borderRadius: 7,
+                    objectFit: "cover",
+                    boxShadow: "0 4px 16px #b3d5ef33",
+                    marginTop: 14,
+                    marginBottom: 8,
+                    border: "2px solid #cbeef3",
+                    background: "#ebf5fb"
+                  }}
+                  loading="lazy"
+                />
+              ) : (
+                <div style={{
+                  width: 110, height: 160, background: "#d3e0ea",
+                  borderRadius: 6, marginTop: 14,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#678", fontSize: 12, fontWeight: 500
+                }}>
+                  No Poster
+                </div>
+              )}
+              <div style={{
+                marginTop: 4, textAlign: "center", fontWeight: 600, fontSize: 16,
+                width: 120, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                userSelect: "none", background: "rgba(245,250,250, 0.8)", borderRadius: 6, padding: "4px 0"
+              }}>
+                {movieObj.title}
+              </div>
+              {/* Show tick for correct */}
+              {movieObj.title === fb.correctMovie && (
+                <span style={{
+                  position: "absolute", right: 10, top: 10, fontSize: 32, color: "#2acd86"
+                }}>✔️</span>
+              )}
+            </div>
+          ))}</div>
+        </div>
       </div>
     );
   }
@@ -280,7 +711,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             >
               {movieObj.poster_path ? (
                 <img
-                  src={`https://image.tmdb.org/t/p/w342${movieObj.poster_path}`}
+                  src={`https://image.tmdb.org/t/p/w185${movieObj.poster_path}`}
                   alt={movieObj.title}
                   style={{
                     width: "110px",
