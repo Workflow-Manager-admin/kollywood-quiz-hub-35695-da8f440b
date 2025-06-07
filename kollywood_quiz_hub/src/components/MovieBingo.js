@@ -172,7 +172,9 @@ function MovieBingo({ onBackToDashboard }) {
   const [movies, setMovies] = useState([]); // 9 unique movie objects
   const [questions, setQuestions] = useState([]); // 9 {question, find, checker}
   const [round, setRound] = useState(0); // 0..8
-  const [lockedCellIdx, setLockedCellIdx] = useState(null);
+  // For each cell, stores: null if never selected, else {status: 'correct'|'wrong'}
+  const [gridLockStates, setGridLockStates] = useState(Array(N).fill(null));
+  const [cellFeedback, setCellFeedback] = useState({idx: null, correctIdx: null, result: null}); // {idx, correctIdx, result}
   const [feedbackStates, setFeedbackStates] = useState([]); // [{clicked: idx, correctIdx: idx, status:'correct'|'wrong'}...]
   const [quizCompleted, setQuizCompleted] = useState(false);
 
@@ -183,9 +185,10 @@ function MovieBingo({ onBackToDashboard }) {
       setError("");
       setLoading(true);
       setQuizCompleted(false);
-      setLockedCellIdx(null);
       setFeedbackStates([]);
       setRound(0);
+      setGridLockStates(Array(N).fill(null));
+      setCellFeedback({idx: null, correctIdx: null, result: null});
       // 1. Fetch unique movies, robust fallback if fails.
       let bingoMovies = [];
       try {
@@ -206,23 +209,39 @@ function MovieBingo({ onBackToDashboard }) {
       setQuestions(shuffledQuestions);
       setLoading(false);
       setQuizCompleted(false);
-      setLockedCellIdx(null);
       setFeedbackStates([]);
       setRound(0);
+      setGridLockStates(Array(N).fill(null));
+      setCellFeedback({idx: null, correctIdx: null, result: null});
     }
     start();
     return () => { isMounted = false; }
   }, []);
 
-  // Handle cell click: Only allow when not locked and on current round. Visual feedback before next round.
+  // Handle cell click: Each cell can only be picked once. After picked, color locks and cell is non-interactable forever.
   function handleGridClick(idx) {
-    if (loading || quizCompleted || lockedCellIdx !== null || !movies[idx]) return;
+    if (
+      loading ||
+      quizCompleted ||
+      gridLockStates[idx] !== null || // already guessed
+      cellFeedback.idx !== null || // feedback is showing
+      !movies[idx]
+    ) return;
+
+    // Evaluate correctness for this round
     const correctAns = questions[round].find(movies)
       || movies.find(m => questions[round].isCorrect(m));
     const correctIdx = movies.findIndex(m => m && m.id === (correctAns && correctAns.id));
     const wasCorrect = idx === correctIdx;
 
-    setLockedCellIdx(idx);
+    // Lock-in cell (permanent, persists across all rounds)
+    setGridLockStates(prev => {
+      const out = [...prev];
+      out[idx] = { status: wasCorrect ? "correct" : "wrong", round, question: questions[round].question };
+      return out;
+    });
+
+    setCellFeedback({ idx, correctIdx, result: wasCorrect ? "correct" : "wrong" });
     setFeedbackStates(prev => [
       ...prev,
       {
@@ -232,13 +251,14 @@ function MovieBingo({ onBackToDashboard }) {
     ]);
 
     setTimeout(() => {
+      // Advance to next round or end
+      setCellFeedback({idx: null, correctIdx: null, result: null});
       if (round === N - 1) {
         setQuizCompleted(true);
       } else {
-        setRound(round + 1);
-        setLockedCellIdx(null);
+        setRound(r => r + 1);
       }
-    }, 950); // Show color feedback before next
+    }, 950);
   }
 
   // On finish, compile answer/result array to match conventions
@@ -268,7 +288,7 @@ function MovieBingo({ onBackToDashboard }) {
         game="Movie Bingo"
       />
     );
-  // If a critical network/tmdb error disabled game, display fallback error immediately
+  // Error fallback if critical failure
   if (!!error && (!movies || !movies.length))
     return (
       <div className="container" style={{ paddingTop: 100 }}>
@@ -334,27 +354,36 @@ function MovieBingo({ onBackToDashboard }) {
       {/* GRID */}
       <div style={gridStyle}>
         {movies.map((movie, idx) => {
-          // Compute visual style
-          let cellStatus = "";
-          if (lockedCellIdx !== null) {
-            if (idx === lockedCellIdx) {
-              cellStatus = lockedCellIdx === currCorrectIdx ? "correct" : "wrong";
-            } else if (idx === currCorrectIdx) {
-              cellStatus = lockedCellIdx === currCorrectIdx ? "correct" : "";
-            }
+          // Determine this cell's permanent state: null = never selected; else locked forever.
+          const lock = gridLockStates[idx];
+          // Determine if in "feedback" animation stage this round (for latest guess)
+          let showStatus = "";
+          if (cellFeedback.idx !== null && idx === cellFeedback.idx) {
+            showStatus = cellFeedback.result;
+          } else if (lock) {
+            showStatus = lock.status;
           }
-          let bg = "#f8fcfe"; let border = "2.5px solid #bbf7fd";
-          if (cellStatus === "correct") {
-            bg = "#47f17d"; border = "3.5px solid #1ba94f";
-          } else if (cellStatus === "wrong") {
-            bg = "#ef5555"; border = "3.5px solid #bd232d";
+          let bg = "#f8fcfe", border = "2.5px solid #bbf7fd";
+          if (showStatus === "correct") {
+            bg = "#47f17d";
+            border = "3.5px solid #1ba94f";
+          } else if (showStatus === "wrong") {
+            bg = "#ef5555";
+            border = "3.5px solid #bd232d";
           }
+          // Locked forever after guess
+          let isLocked = lock !== null;
+          // Only clickable if never guessed and not in feedback animation and not completed/disabled
+          let isClickable =
+            !isLocked &&
+            !quizCompleted &&
+            cellFeedback.idx === null &&
+            !loading;
+
           return (
             <div
               key={movie.id}
-              onClick={() => 
-                lockedCellIdx === null && !quizCompleted ? handleGridClick(idx) : undefined
-              }
+              onClick={isClickable ? () => handleGridClick(idx) : undefined}
               style={{
                 background: bg,
                 border: border,
@@ -366,9 +395,9 @@ function MovieBingo({ onBackToDashboard }) {
                 minWidth: 76,
                 maxWidth: 170,
                 textAlign: "center",
-                cursor: lockedCellIdx !== null || quizCompleted ? "no-drop" : "pointer",
-                boxShadow: cellStatus
-                  ? (cellStatus === "correct"
+                cursor: isClickable ? "pointer" : "not-allowed",
+                boxShadow: showStatus
+                  ? (showStatus === "correct"
                       ? "0 0 15px #80f0c3"
                       : "0 0 9px #e23e49")
                   : "0 2px 11px #c2eefd22",
@@ -376,12 +405,12 @@ function MovieBingo({ onBackToDashboard }) {
                 margin: 0,
                 position: "relative",
                 transition: "box-shadow .13s, background .14s, border .14s",
-                opacity: quizCompleted ? 0.71 : 1,
+                opacity: isLocked || quizCompleted ? 0.71 : 1,
                 outline: "none",
                 overflowWrap: "break-word"
               }}
-              aria-label={`Movie: ${movie.title}`}
-              tabIndex={lockedCellIdx === null ? 0 : -1}
+              aria-label={`Movie: ${movie.title}${isLocked ? " (locked)" : ""}`}
+              tabIndex={isClickable ? 0 : -1}
             >
               <div style={{
                 color: "#1865be",
@@ -389,7 +418,7 @@ function MovieBingo({ onBackToDashboard }) {
                 fontSize: 17,
                 padding: "10px 2px 2px 2px",
                 lineHeight: 1.12,
-                opacity: cellStatus === "wrong" ? 0.7 : 1,
+                opacity: showStatus === "wrong" ? 0.7 : 1,
                 whiteSpace: "pre-wrap"
               }}>
                 {movie.title}
@@ -402,30 +431,47 @@ function MovieBingo({ onBackToDashboard }) {
               }}>
                 {movie.release_date ? movie.release_date.slice(0,4) : ""}
               </div>
-              {cellStatus === "correct" && (
+              {showStatus === "correct" && (
                 <span
                   style={{
                     position: "absolute", right: 8, top: 6,
                     fontSize: 29, color: "#18b244", opacity: 0.8,
                   }}>✔️</span>
               )}
-              {cellStatus === "wrong" && (
+              {showStatus === "wrong" && (
                 <span
                   style={{
                     position: "absolute", right: 8, top: 6,
                     fontSize: 27, color: "#e02947", opacity: 0.77,
                   }}>✖️</span>
               )}
+              {isLocked && (
+                <span
+                  style={{
+                    position: "absolute",
+                    left: 7,
+                    bottom: 5,
+                    color: "#b1b2b9",
+                    fontSize: 14,
+                    opacity: 0.78,
+                    pointerEvents: "none",
+                    fontWeight: 600
+                  }}
+                  title="Locked"
+                >
+                  🔒
+                </span>
+              )}
             </div>
           );
         })}
       </div>
-      {lockedCellIdx !== null && (
+      {cellFeedback.idx !== null && (
         <div style={{
           textAlign: "center", marginTop: 18, fontWeight: 600, fontSize: 16,
-          color: lockedCellIdx === currCorrectIdx ? "#009960" : "#e6332e", minHeight: 32
+          color: cellFeedback.idx === cellFeedback.correctIdx ? "#009960" : "#e6332e", minHeight: 32
         }}>
-          {lockedCellIdx === currCorrectIdx
+          {cellFeedback.idx === cellFeedback.correctIdx
             ? "🎉 Correct! Moving to next question..."
             : (
               <>
