@@ -32,10 +32,10 @@ function Dashboard({ username, onGameSelect }) {
       icon: "🎲"
     },
     {
-      key: "emojiQuiz",
-      title: "Emoji Movie Quiz",
-      desc: "Guess the movie from emoji story!",
-      icon: "😁🎬"
+      key: "movieSpin",
+      title: "Movie Spin Challenge",
+      desc: "Spin the actor, genre, and location wheels. Guess a movie that matches all three!",
+      icon: "🎰"
     }
   ];
 

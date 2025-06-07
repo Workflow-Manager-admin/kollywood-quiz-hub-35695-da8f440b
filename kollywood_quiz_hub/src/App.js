@@ -8,7 +8,8 @@ import BlurredPosterQuiz from "./components/BlurredPosterQuiz";
 import CharacterMovieMatch from "./components/CharacterMovieMatch";
 import MysteryMovieDetective from "./components/MysteryMovieDetective";
 import MovieBingo from "./components/MovieBingo";
-import EmojiMovieQuiz from "./components/EmojiMovieQuiz";
+import MovieSpinChallenge from "./components/MovieSpinChallenge";
+// import EmojiMovieQuiz from "./components/EmojiMovieQuiz";  // Removed (replaced)
 
 function App() {
   // App navigation state
@@ -35,7 +36,8 @@ function App() {
     characterMatch: <CharacterMovieMatch onBackToDashboard={handleBackToDashboard} />,
     mysteryDetective: <MysteryMovieDetective onBackToDashboard={handleBackToDashboard} />,
     movieBingo: <MovieBingo onBackToDashboard={handleBackToDashboard} />,
-    emojiQuiz: <EmojiMovieQuiz onBackToDashboard={handleBackToDashboard} />,
+    movieSpin: <MovieSpinChallenge onBackToDashboard={handleBackToDashboard} />,
+    // "emojiQuiz" gameKey is deprecated
   };
 
   return (
