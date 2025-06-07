@@ -16,7 +16,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   // All poster_paths point to genuine Kollywood TMDB posters.
   const FALLBACK_QUESTIONS = [
     {
-      clue: "Kuyil",
+      clue: "meiyazagan", // updated clue for Meiyazhagan
       correctMovie: "Meiyazhagan",
       correctMovieObj: {
         title: "Meiyazhagan",
@@ -144,7 +144,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Chitti", movie: "Enthiran" },
     { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
     { character: "Velu Naicker", movie: "Nayakan" },
-    { character: "Kuyil", movie: "Meiyazhagan" },        // Meiyazhagan pairing
+    { character: "meiyazagan", movie: "Meiyazhagan" },        // Meiyazhagan pairing (updated)
     { character: "Tamizh", movie: "Cuckoo" },            // Cuckoo pairing
     { character: "Muthu", movie: "Muthu" },
     { character: "Maari", movie: "Maari" },
