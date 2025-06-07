@@ -355,6 +355,23 @@ function CharacterMovieMatch({ onBackToDashboard }) {
   // TMDB Images base URL constant
   const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w185";
 
+  // Debug: Log the TMDB image base (and check if matches correct string)
+  useEffect(() => {
+    if (window && window.console) {
+      console.log("[CharacterMovieMatch] Using TMDB_IMAGE_BASE:", TMDB_IMAGE_BASE);
+      const expectedBase = 'https://image.tmdb.org/t/p/w185';
+      if (TMDB_IMAGE_BASE === expectedBase) {
+        console.log("[CharacterMovieMatch] TMDB_IMAGE_BASE matches expected base:", expectedBase);
+      } else {
+        console.warn("[CharacterMovieMatch] TMDB_IMAGE_BASE does NOT match expected base!", TMDB_IMAGE_BASE, "Expected:", expectedBase);
+      }
+      // If a .env or other config is being used, log attempted value (not actually referenced here, but for diagnostic completeness)
+      if (process && process.env && process.env.REACT_APP_TMDB_IMAGE_BASE) {
+        console.log("[CharacterMovieMatch] REACT_APP_TMDB_IMAGE_BASE (from .env):", process.env.REACT_APP_TMDB_IMAGE_BASE);
+      }
+    }
+  }, []);
+
   // State declarations
   const [allMovies, setAllMovies] = useState([]);
   const [questions, setQuestions] = useState([]); // One entry per quiz round: { clue, correctMovieObj, choices: [movieObj,...] }
@@ -660,7 +677,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                 }}>✔️</span>
               )}
             </div>
-          ))}</div>
+          ); // <-- Add missing semicolon
+          })}</div>
         </div>
       </div>
     );
@@ -738,8 +756,38 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             pointerEvents: reveal ? "none" : "auto"
           }}
         >
-          {question.choices.map((movieObj, idx) => (
-            <div
+          {question.choices.map((movieObj, idx) => {
+            // Diagnostic logging for image URL assembly and poster_path
+            const logCtx = {
+              round: step + 1,
+              optionIdx: idx,
+              title: movieObj.title,
+              poster_path: movieObj.poster_path,
+              TMDB_IMAGE_BASE,
+              url: movieObj.poster_path ? `${TMDB_IMAGE_BASE}${movieObj.poster_path}` : null,
+              TMDB_BASE_expected: 'https://image.tmdb.org/t/p/w185',
+              baseMatches: TMDB_IMAGE_BASE === 'https://image.tmdb.org/t/p/w185'
+            };
+            if (window && window.console) {
+              console.log(`[CharacterMovieMatch][Round=${step + 1}][Option=${idx}]`, "Rendering Poster.", {
+                title: movieObj.title,
+                poster_path: movieObj.poster_path,
+                TMDB_IMAGE_BASE,
+                url: logCtx.url,
+                TMDB_BASE_expected: logCtx.TMDB_BASE_expected,
+                baseMatches: logCtx.baseMatches
+              });
+              if (!movieObj.poster_path) {
+                console.warn(
+                  `[CharacterMovieMatch][Round=${step + 1}][Option=${idx}] poster_path is missing or empty`,
+                  movieObj
+                );
+              }
+              if (typeof process !== "undefined" && process.env && process.env.REACT_APP_TMDB_IMAGE_BASE) {
+                console.log("[CharacterMovieMatch] .env TMDB image base (REACT_APP_TMDB_IMAGE_BASE) value:", process.env.REACT_APP_TMDB_IMAGE_BASE);
+              }
+            }
+            return (
               key={movieObj.id || idx}
               onDrop={e => handleDropOnPoster(movieObj, idx, e)}
               onDragOver={allowDrop}
