@@ -77,11 +77,13 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     { character: "Chitti", movie: "Enthiran" },
     { character: "Anbuchelvan IPS", movie: "Kaakha Kaakha" },
     { character: "Velu Naicker", movie: "Nayakan" },
+    // Ensure "Gentleman" round uses correct TMDB data
     { character: "Gentleman", movie: "Gentleman" },
-    // Replacing 'Thillana Mohanambal' with 'Muthu'
+    // Replacing 'Thillana Mohanambal' with 'Muthu' (with TMDB ID 109007)
     { character: "Muthu", movie: "Muthu" },
     { character: "Maari", movie: "Maari" },
     { character: "Subramani", movie: "Mouna Ragam" },
+    // Ensure "VIP" round uses correct TMDB data
     { character: "Dhanush", movie: "VIP" },
     { character: "Nallasivam", movie: "Anbe Sivam" },
     { character: "Rangasamy", movie: "Sivaji" }
@@ -144,25 +146,25 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     const VIP_OVERRIDE = {
       title: "VIP",
       id: 278788,
-      poster_path: "/t6MZAuT9x6nEnv7t9MkRUgyw35E.jpg", // from TMDB
+      poster_path: "/t6MZAuT9x6nEnv7t9MkRUgyw35E.jpg", // TMDB (Kollywood)
       original_language: "ta",
     };
     // Gentleman (1993) - ID: 97596
     const GENTLEMAN_OVERRIDE = {
       title: "Gentleman",
       id: 97596,
-      poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg", // from TMDB
+      poster_path: "/pBvGlZ4Xd0G4MmJwCuWHa3gwxM7.jpg", // TMDB (Kollywood)
       original_language: "ta",
     };
-    // Muthu (Rajinikanth, 1995) - ID: 35608
+    // Muthu (Rajinikanth, 1995) - ID: 109007
     const MUTHU_OVERRIDE = {
       title: "Muthu",
-      id: 35608,
-      poster_path: "/4xA5eQqr8RP4eAbOeXtfLOcAfeQ.jpg", // from TMDB
+      id: 109007,
+      poster_path: "/qBW0rUHkAxe6G0OBHuZRL4pEruM.jpg", // TMDB (Kollywood)
       original_language: "ta",
     };
 
-    // Helper: get movie object with poster_path override for specific movies
+    // Helper: get movie object with poster_path override for specific movies (using correct TMDB ID/poster)
     function getMovieOverrideObj(title) {
       if (title === "VIP") return { ...VIP_OVERRIDE };
       if (title === "Gentleman") return { ...GENTLEMAN_OVERRIDE };
@@ -179,7 +181,7 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         if (!correctMovieObj) {
           correctMovieObj = await fetchTMDBMovieByTitle(pair.movie);
         }
-        // Force override poster_path for VIP, Gentleman, and Muthu to be correct, regardless what TMDB returns
+        // Enforce overrides for VIP, Gentleman, Muthu: always use correct TMDB data
         if (pair.movie === "VIP") {
           correctMovieObj = { ...VIP_OVERRIDE };
         }
@@ -229,10 +231,15 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           choicesArr.some(c => !c.poster_path);
 
         if (fallbackNeeded) {
-          setQuestions(FALLBACK_QUESTIONS);
-          setUsingFallback(true);
-          setLoading(false);
-          return;
+          // Only fallback if not VIP/Gentleman/Muthu round, as those will always have posters above
+          if (
+            !["VIP", "Gentleman", "Muthu"].includes(pair.movie)
+          ) {
+            setQuestions(FALLBACK_QUESTIONS);
+            setUsingFallback(true);
+            setLoading(false);
+            return;
+          }
         }
         rounds.push({
           clue: pair.character,
