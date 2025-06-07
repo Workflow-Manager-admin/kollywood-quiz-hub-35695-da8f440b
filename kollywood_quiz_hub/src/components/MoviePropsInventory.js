@@ -124,6 +124,11 @@ function MoviePropsInventory({ onBackToDashboard }) {
       .map(a => a[0]);
   }
 
+  // Normalize a movie title for use as ID alternative
+  function normalizeTitle(title) {
+    return (title || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+
   /**
    * Extract up to 4 highly unique and concrete prop clues from TMDB movie details + keywords.
    * Each clue should maximize uniqueness for this title in the round.
@@ -299,6 +304,8 @@ function MoviePropsInventory({ onBackToDashboard }) {
     }
   }
 
+  // --- Used movies session tracking ---
+  const [usedMovies, setUsedMovies] = useState([]);
   // MAIN ROUNDS GENERATION (prefer TMDB, fallback to curated static)
   const [quizRounds, setQuizRounds] = useState(null);
   const [tmdbMode, setTmdbMode] = useState(false);
@@ -310,12 +317,22 @@ function MoviePropsInventory({ onBackToDashboard }) {
   const [quizOver, setQuizOver] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Track used movies for the current session/game.
+  // Reset it on complete replay or game start.
   useEffect(() => {
     let cancelled = false;
     // Try TMDB-based rounds first for max accuracy/uniqueness
     async function bootstrap() {
       setLoading(true);
       setTmdbMode(false);
+      setUsedMovies([]); // Reset used movies array on new game start
+      setStep(0);
+      setUserInput("");
+      setUserAnswers([]);
+      setShowFeedback(null);
+      setReveal(false);
+      setQuizOver(false);
+
       const tmdbRounds = await generatePropRoundsFromTMDB(QUESTIONS);
       if (!cancelled && tmdbRounds && tmdbRounds.length === QUESTIONS) {
         setQuizRounds(tmdbRounds);
@@ -323,9 +340,9 @@ function MoviePropsInventory({ onBackToDashboard }) {
         setLoading(false);
         return;
       }
-      // fallback: select QUESTIONS unique hand-curated
-      let arr = shuffle(FALLBACK_PROP_CLUES).slice(0, QUESTIONS);
-      setQuizRounds(arr);
+      // fallback: select QUESTIONS unique hand-curated movies not already used
+      let fallbackPool = shuffle(FALLBACK_PROP_CLUES);
+      setQuizRounds(fallbackPool.slice(0, QUESTIONS));
       setTmdbMode(false);
       setLoading(false);
     }
@@ -333,6 +350,21 @@ function MoviePropsInventory({ onBackToDashboard }) {
     return () => { cancelled = true; };
     // eslint-disable-next-line
   }, []);
+
+  // Each time a round is answered or skipped (here: after submit or reveal), track movie as used.
+  useEffect(() => {
+    if (!quizRounds || !quizRounds[step]) return;
+    // Include current as "used" if answer submitted or revealed
+    // The usedMovies state is updated in handleSubmit and handleReveal below, at each advancement step.
+  }, [step, quizRounds]);
+
+  // Helper to get a unique movie key (id or title), for both TMDB & fallback
+  function getMovieKey(round) {
+    if (!round) return null;
+    // For TMDB movies, .id may be a number or string; for fallback, use normalized .answer
+    if (round.id) return String(round.id);
+    return normalizeTitle(round.answer);
+  }
 
   // PUBLIC_INTERFACE - Submission handler
   function handleSubmit(e) {
@@ -347,6 +379,11 @@ function MoviePropsInventory({ onBackToDashboard }) {
       { guess, correct: correctTitle, wasCorrect }
     ]);
     setReveal(false);
+
+    // Track movie as "used" by pushing key to state
+    const key = getMovieKey(quizRounds[step]);
+    setUsedMovies(prev => prev.includes(key) ? prev : [...prev, key]);
+
     setTimeout(() => {
       setShowFeedback(null);
       setUserInput("");
@@ -364,6 +401,55 @@ function MoviePropsInventory({ onBackToDashboard }) {
       ...prev,
       { guess: "", correct: correctTitle, wasCorrect: false, revealed: true }
     ]);
+    // Track movie as "used"
+    const key = getMovieKey(quizRounds[step]);
+    setUsedMovies(prev => prev.includes(key) ? prev : [...prev, key]);
+  }
+
+  // ---- Utility function to get next unused round (if game logic is ever adapted for random choice) ----
+  // Used for future extensibility.
+  function getNextUnusedRound(rounds, usedMovieKeys) {
+    for (let i = 0; i < rounds.length; ++i) {
+      const key = getMovieKey(rounds[i]);
+      if (!usedMovieKeys.includes(key)) return i;
+    }
+    return null; // All used
+  }
+
+  // --- On game replay, clear tracked arrays
+  function handleRestartGame() {
+    setUsedMovies([]);
+    setQuizOver(false);
+    setStep(0);
+    setUserAnswers([]);
+    setShowFeedback(null);
+    setUserInput("");
+    setReveal(false);
+    // Force new quiz rounds regeneration
+    setQuizRounds(null);
+    setLoading(true);
+
+    // Bootstrap again (simulate full reset)
+    let cancelled = false;
+    async function bootstrap() {
+      setLoading(true);
+      setTmdbMode(false);
+      setUsedMovies([]); // Reset used movies array on new game start
+      const tmdbRounds = await generatePropRoundsFromTMDB(QUESTIONS);
+      if (!cancelled && tmdbRounds && tmdbRounds.length === QUESTIONS) {
+        setQuizRounds(tmdbRounds);
+        setTmdbMode(true);
+        setLoading(false);
+        return;
+      }
+      // fallback
+      let fallbackPool = shuffle(FALLBACK_PROP_CLUES);
+      setQuizRounds(fallbackPool.slice(0, QUESTIONS));
+      setTmdbMode(false);
+      setLoading(false);
+    }
+    bootstrap();
+    // No need for cancel guard in restart.
   }
 
   // Render the prop clue box for 4 strong-styled clues (emojis or text)
@@ -447,7 +533,11 @@ function MoviePropsInventory({ onBackToDashboard }) {
         score={userAnswers.filter(a => a.wasCorrect).length}
         total={QUESTIONS}
         answers={userAnswers}
-        onHome={onBackToDashboard}
+        // When going home, reset the game state and used movies tracking for a new session.
+        onHome={() => {
+          handleRestartGame();
+          onBackToDashboard();
+        }}
         game="Movie Props Inventory"
       />
     );
