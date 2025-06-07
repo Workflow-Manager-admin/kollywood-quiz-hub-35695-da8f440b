@@ -157,34 +157,96 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           justifyContent: "center",
           flexWrap: "wrap"
         }}>
-          {[questions[step].movie].concat(
-            questions.slice(step + 1, step + 3).map(q => q.movie)
-          ).sort(() => 0.5 - Math.random()).map(movie => (
-            <div
-              key={movie}
-              onDrop={e => { handleDrop(movie, e); setDraggedChar(null); }}
-              onDragOver={e => e.preventDefault()}
-              tabIndex={0}
-              style={{
-                background: "#e0eefc",
-                minWidth: 130,
-                minHeight: 50,
-                border: selectedMovie === movie ? "2px solid #4796e6" : "2px dashed #aaa",
-                borderRadius: 7,
-                alignItems: "center",
-                display: "flex",
-                justifyContent: "center",
-                fontSize: 19,
-                color: "#111",
-                fontWeight: 500,
-                margin: 6,
-                cursor: "pointer"
-              }}
-              onClick={() => setSelectedMovie(movie)}
-            >
-              {movie}
-            </div>
-          ))}
+          {/* Construct movie choices with poster */}
+          {(() => {
+            // Compose current and distractor movies, with their objects
+            const real = questions[step];
+            // Get next 2 random distractor movies if available, or fallback to previous
+            const distractors = [];
+            // Avoid picking duplicate movies
+            let grabbed = new Set();
+            grabbed.add(real.movie);
+
+            // Prefer distinct distractors
+            for (let i = step + 1; i < questions.length && distractors.length < 2; ++i) {
+              if (!grabbed.has(questions[i].movie)) {
+                distractors.push(questions[i]);
+                grabbed.add(questions[i].movie);
+              }
+            }
+            for (let i = 0; i < questions.length && distractors.length < 2; ++i) {
+              if (!grabbed.has(questions[i].movie)) {
+                distractors.push(questions[i]);
+                grabbed.add(questions[i].movie);
+              }
+            }
+
+            // All options
+            const options = [real, ...distractors].sort(() => 0.5 - Math.random());
+
+            return options.map(opt => (
+              <div
+                key={opt.movie}
+                onDrop={e => { handleDrop(opt.movie, e); setDraggedChar(null); }}
+                onDragOver={e => e.preventDefault()}
+                tabIndex={0}
+                style={{
+                  background: "#e0eefc",
+                  minWidth: 130,
+                  minHeight: 180,
+                  border: selectedMovie === opt.movie ? "2px solid #4796e6" : "2px dashed #aaa",
+                  borderRadius: 7,
+                  alignItems: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-start",
+                  fontSize: 19,
+                  color: "#111",
+                  fontWeight: 500,
+                  margin: 6,
+                  cursor: "pointer",
+                  boxShadow: selectedMovie === opt.movie ? "0 2px 12px #b9e5ff" : "0 1px 6px #e2f2fd"
+                }}
+                onClick={() => setSelectedMovie(opt.movie)}
+              >
+                {opt.movieObj.poster_path ? (
+                  <img
+                    src={`https://image.tmdb.org/t/p/w185${opt.movieObj.poster_path}`}
+                    alt={opt.movie}
+                    width={110}
+                    height={160}
+                    style={{
+                      borderRadius: 5,
+                      objectFit: "cover",
+                      marginTop: 10,
+                      background: "#eaf1ff",
+                      border: selectedMovie === opt.movie ? "2px solid #4796e6" : "2px solid #e0eefc"
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 110,
+                    height: 160,
+                    background: "#ccd7e9",
+                    borderRadius: 5,
+                    marginTop: 10
+                  }} />
+                )}
+                <div style={{
+                  marginTop: 10,
+                  textAlign: "center",
+                  fontWeight: 600,
+                  fontSize: 17,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  width: 110
+                }}>
+                  {opt.movie}
+                </div>
+              </div>
+            ));
+          })()}
         </div>
         <form onSubmit={handleSubmit}>
           <button type="submit" className="btn btn-large" style={{ marginTop: 16, width: 160, color: "#111", background: "#a9e9c9" }} disabled={!selectedMovie || reveal || justRevealed}>
