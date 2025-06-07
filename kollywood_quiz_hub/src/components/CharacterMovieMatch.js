@@ -352,6 +352,9 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     }
   ];
 
+  // TMDB Images base URL constant
+  const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w185";
+
   // State declarations
   const [allMovies, setAllMovies] = useState([]);
   const [questions, setQuestions] = useState([]); // One entry per quiz round: { clue, correctMovieObj, choices: [movieObj,...] }
@@ -600,8 +603,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
               aria-label={`Demo poster for ${movieObj.title}`}>
               {movieObj.poster_path ? (
                 <img
-                  src={`https://image.tmdb.org/t/p/w185${movieObj.poster_path}`}
-                  alt={movieObj.title}
+                  src={`${TMDB_IMAGE_BASE}${movieObj.poster_path}`}
+                  alt={movieObj.title ? `Poster for ${movieObj.title}` : "Movie Poster"}
                   style={{
                     width: "110px",
                     height: "160px",
@@ -614,6 +617,24 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                     background: "#ebf5fb"
                   }}
                   loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.style.display = "none";
+                    const fallbackDiv = document.createElement("div");
+                    fallbackDiv.textContent = "Poster Unavailable";
+                    fallbackDiv.style.width = "110px";
+                    fallbackDiv.style.height = "160px";
+                    fallbackDiv.style.background = "#d3e0ea";
+                    fallbackDiv.style.borderRadius = "6px";
+                    fallbackDiv.style.marginTop = "14px";
+                    fallbackDiv.style.display = "flex";
+                    fallbackDiv.style.alignItems = "center";
+                    fallbackDiv.style.justifyContent = "center";
+                    fallbackDiv.style.color = "#678";
+                    fallbackDiv.style.fontSize = "12px";
+                    fallbackDiv.style.fontWeight = "500";
+                    e.currentTarget.parentNode.appendChild(fallbackDiv);
+                  }}
                 />
               ) : (
                 <div style={{
@@ -752,8 +773,8 @@ function CharacterMovieMatch({ onBackToDashboard }) {
             >
               {movieObj.poster_path ? (
                 <img
-                  src={`https://image.tmdb.org/t/p/w185${movieObj.poster_path}`}
-                  alt={movieObj.title}
+                  src={`${TMDB_IMAGE_BASE}${movieObj.poster_path}`}
+                  alt={movieObj.title ? `Poster for ${movieObj.title}` : "Movie Poster"}
                   style={{
                     width: "110px",
                     height: "160px",
@@ -766,6 +787,25 @@ function CharacterMovieMatch({ onBackToDashboard }) {
                     background: "#ebf5fb",
                   }}
                   loading="lazy"
+                  // Error handling: fallback if image fails to load
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.style.display = "none";
+                    const fallbackDiv = document.createElement("div");
+                    fallbackDiv.textContent = "Poster Unavailable";
+                    fallbackDiv.style.width = "110px";
+                    fallbackDiv.style.height = "160px";
+                    fallbackDiv.style.background = "#d3e0ea";
+                    fallbackDiv.style.borderRadius = "6px";
+                    fallbackDiv.style.marginTop = "14px";
+                    fallbackDiv.style.display = "flex";
+                    fallbackDiv.style.alignItems = "center";
+                    fallbackDiv.style.justifyContent = "center";
+                    fallbackDiv.style.color = "#678";
+                    fallbackDiv.style.fontSize = "12px";
+                    fallbackDiv.style.fontWeight = "500";
+                    e.currentTarget.parentNode.appendChild(fallbackDiv);
+                  }}
                 />
               ) : (
                 <div style={{
