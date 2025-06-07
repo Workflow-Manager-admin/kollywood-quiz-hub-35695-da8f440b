@@ -5,6 +5,26 @@ import React from "react";
  * Shows user's score, correct answers, and navigation button PUBLIC_INTERFACE
  */
 function QuizResult({ score, total, answers, onHome, game }) {
+  // Helper: Render movie title and poster if available for richer answers
+  function renderMovieAnswer(title, poster, fallback = "—") {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+        {poster ? (
+          <img
+            src={
+              poster.startsWith("http")
+                ? poster
+                : `https://image.tmdb.org/t/p/w92${poster}`
+            }
+            alt={title || fallback}
+            style={{ width: 36, height: 52, objectFit: "cover", borderRadius: 4, marginRight: 5, border: "1.5px solid #b8ede8" }}
+          />
+        ) : null}
+        <span>{title || fallback}</span>
+      </span>
+    );
+  }
+
   return (
     <div className="container" style={{ paddingTop: 100, textAlign: "center" }}>
       <h2 className="title" style={{ color: "#2494a8", fontSize: "2.2rem", marginBottom: 10 }}>
@@ -29,11 +49,20 @@ function QuizResult({ score, total, answers, onHome, game }) {
               <li key={i} style={{ marginBottom: 12, borderBottom: "1px solid #e3f0fb", paddingBottom: 8 }}>
                 {a.character && <span><b>Character:</b> {a.character}<br /></span>}
                 <span>
-                  <b>Your Answer:</b> <span style={{ color: a.wasCorrect ? "#27b14b" : "#b11124" }}>
-                    {typeof a.revealed !== "undefined" && a.revealed ? <em>Revealed (no score)</em> : (a.guess || a.guessedMovie || (a.title || "—"))}
+                  <b>Your Answer:</b>{" "}
+                  <span style={{ color: a.wasCorrect ? "#27b14b" : "#b11124" }}>
+                    {typeof a.revealed !== "undefined" && a.revealed
+                      ? <em>Revealed (no score)</em>
+                      : (a.answerTitle
+                          ? renderMovieAnswer(a.answerTitle, a.answerPoster)
+                          : a.guess || a.guessedMovie || (a.title || "—"))
+                    }
                   </span>
                   <br />
-                  <b>Correct:</b> {a.correct || a.actualMovie || a.title || "—"}
+                  <b>Correct:</b>{" "}
+                  {a.correctTitle
+                    ? renderMovieAnswer(a.correctTitle, a.correctPoster)
+                    : (a.correct || a.actualMovie || a.title || "—")}
                 </span>
               </li>
             ))}

@@ -254,15 +254,33 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     setTimeout(() => recordAnswer(movieObj), 350);
   }
 
+  // PUBLIC_INTERFACE
+  /**
+   * Records the user's answer for the current round, using IDs and titles for full reliability.
+   */
   function recordAnswer(selectedMovieObj) {
-    const isCorrect = selectedMovieObj.title === questions[step].correctMovie;
+    // Prefer TMDB movie ID if available for comparison, fallback to title if needed
+    const correctMovieObj = questions[step].choices.find(
+      c => c.title === questions[step].correctMovie
+    ) || questions[step].correctMovieObj;
+
+    // Use ID if present, else title match (ensures correctness even if poster/choice order changes)
+    const isCorrect = (
+      (selectedMovieObj.id && correctMovieObj && selectedMovieObj.id === correctMovieObj.id) ||
+      (!selectedMovieObj.id && selectedMovieObj.title === questions[step].correctMovie)
+    );
+
     setUserAnswers(prev => [
       ...prev,
       {
         character: questions[step].clue,
         answerTitle: selectedMovieObj.title,
+        answerPoster: selectedMovieObj.poster_path || null,
+        answerId: selectedMovieObj.id || null,
         wasCorrect: isCorrect,
-        correctTitle: questions[step].correctMovie
+        correctTitle: correctMovieObj?.title || questions[step].correctMovie,
+        correctPoster: correctMovieObj?.poster_path || null,
+        correctId: correctMovieObj?.id || null
       }
     ]);
     setAnsweredIdx(null);
@@ -317,7 +335,36 @@ function CharacterMovieMatch({ onBackToDashboard }) {
 
   // Defensive/fallback for missing question
   if (!questions[step]) {
+    // Show fallback -- and if this is due to quiz end, show result page using a structure similar to normal answers
+    if (quizOver && userAnswers.length >= 1) {
+      // Go to final result using whatever answers available (for safety)
+      return (
+        <QuizResult
+          score={userAnswers.filter(a => a.wasCorrect).length}
+          total={QUESTIONS}
+          answers={userAnswers}
+          onHome={onBackToDashboard}
+          game="Character-Movie Match"
+        />
+      );
+    }
+
+    // Otherwise, just show fallback first round
     const fb = FALLBACK_QUESTIONS[0];
+    // Optionally, match fallback answer for result page structure
+    if (userAnswers.length === QUESTIONS) {
+      // All fallback rounds were answered, show results
+      return (
+        <QuizResult
+          score={userAnswers.filter(a => a.wasCorrect).length}
+          total={QUESTIONS}
+          answers={userAnswers}
+          onHome={onBackToDashboard}
+          game="Character-Movie Match"
+        />
+      );
+    }
+
     return (
       <div className="container" style={{ paddingTop: 100, marginBottom: 40 }}>
         <button className="btn" style={{ marginBottom: 24 }} onClick={onBackToDashboard}>
