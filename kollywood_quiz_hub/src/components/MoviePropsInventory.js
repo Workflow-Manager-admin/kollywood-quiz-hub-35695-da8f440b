@@ -258,10 +258,18 @@ function MoviePropsInventory({ onBackToDashboard }) {
       </button>
       <QuizProgress current={step + 1} total={QUESTIONS} />
 
-      <h2 className="title" style={{
-        fontSize: "1.42rem", marginBottom: 15, color: "#1762b6",
-        letterSpacing: ".02em", textShadow: "0 2px 8px #ffd"
-      }}>
+      {/* Title: strong, high-visibility color */}
+      <h2
+        className="title"
+        style={{
+          fontSize: "1.42rem",
+          marginBottom: 15,
+          color: "#ffe600", // Bright/high-contrast yellow
+          fontWeight: 900,
+          textShadow: "0 2px 10px #222b, 0 0.5px 12px #ffe44ecc",
+          letterSpacing: ".02em"
+        }}
+      >
         Movie Props Inventory
       </h2>
       <div
