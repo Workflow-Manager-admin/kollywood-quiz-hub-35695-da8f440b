@@ -503,27 +503,29 @@ function MovieSpinChallenge({ onBackToDashboard }) {
     if (!finalCombo || !showRevealHighlight) return null;
     // If revealMovie is null, no such combo match exists
     return (
-      <div style={{
-        margin: "34px auto 16px",
-        padding: "19px 12px 12px 12px",
-        borderRadius: 15,
-        background: "#ffd127",
-        border: "3.5px solid #fe2e2e",
-        boxShadow: "0 6px 22px #fab40075",
-        maxWidth: 370,
-        color: "#2c1805",
-        fontWeight: 900,
-        textAlign: "center",
-        fontSize: 21,
-        position: "relative",
-        zIndex: 10,
-      }}>
+      <div
+        style={{
+          margin: "34px auto 16px",
+          padding: "19px 12px 12px 12px",
+          borderRadius: 15,
+          background: "#181615",
+          border: "3.5px solid #fff966",
+          boxShadow: "0 6px 22px #fab40075",
+          maxWidth: 400,
+          color: "#fff",
+          fontWeight: 900,
+          textAlign: "center",
+          fontSize: 21,
+          position: "relative",
+          zIndex: 10,
+        }}
+      >
         <span role="img" aria-label="Reveal">🎬</span>{" "}
-        <span style={{ color: "#b90613", fontSize: 19, fontWeight: 900 }}>Correct Movie:</span>
+        <span style={{ color: "#ffe600", fontSize: 20, fontWeight: 900, textShadow: "0 1px 18px #333" }}>Correct Movie:</span>
         <br />
         {revealMovie ? (
           <>
-            <span style={{ fontSize: 23, color: "#201582", fontWeight: 900, textShadow: "0 2px 8px #ffe5a2" }}>
+            <span style={{ fontSize: 24, color: "#fff", fontWeight: 900, textShadow: "0 2px 8px #ffe500,0 2px 14px #000" }}>
               {revealMovie.title}
             </span>
             {revealMovie.fullDetails && revealMovie.fullDetails.poster_path && (
@@ -535,32 +537,39 @@ function MovieSpinChallenge({ onBackToDashboard }) {
                     width: 82,
                     height: 118,
                     borderRadius: 6,
-                    border: "3px solid #ad46e8",
-                    boxShadow: "0 5px 21px #cdba4f, 0 1.5px 8px #fff7"
+                    border: "3px solid #ffd700",
+                    boxShadow: "0 5px 21px #ffe66a, 0 1.5px 8px #fff7"
                   }}
                 />
               </div>
             )}
-            <div style={{
-              margin: "10px 0 0 0", color: "#222", fontWeight: 600, fontSize: 15.5,
-              background: "#ffffffcc", borderRadius: 6, padding: "8px 5px 6px 5px",
-              border: "1px solid #ffe43a"
-            }}>
+            <div
+              style={{
+                margin: "10px 0 0 0",
+                color: "#111",
+                fontWeight: 600,
+                fontSize: 16,
+                background: "#fffabbf2",
+                borderRadius: 6,
+                padding: "8px 5px 6px 5px",
+                border: "2px solid #ffe43a"
+              }}
+            >
               <b>Matched:</b>
               {" "}
-              <span style={{ color: "#24bec9" }}>{finalCombo.actor}</span>
+              <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalCombo.actor}</span>
               {" ● "}
-              <span style={{ color: "#ffd700" }}>{finalCombo.genre}</span>
+              <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalCombo.genre}</span>
               {" ● "}
-              <span style={{ color: "#5f24ad" }}>{finalCombo.location}</span>
+              <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalCombo.location}</span>
             </div>
           </>
         ) : (
-          <span style={{ fontSize: 18, color: "#b6001f" }}>
+          <span style={{ fontSize: 18, color: "#ffe100", fontWeight: 700, textShadow: "0 1px 7px #00090a" }}>
             No Kollywood movie from the grid matches <b>all three</b> of:<br />
-            <span style={{ color: "#24bec9" }}>{finalCombo.actor}</span> |{" "}
-            <span style={{ color: "#ffd700" }}>{finalCombo.genre}</span> |{" "}
-            <span style={{ color: "#5f24ad" }}>{finalCombo.location}</span>
+            <span style={{ color: "#24bec9", fontWeight: 700 }}>{finalCombo.actor}</span> |{" "}
+            <span style={{ color: "#ffd700", fontWeight: 700 }}>{finalCombo.genre}</span> |{" "}
+            <span style={{ color: "#5f24ad", fontWeight: 700 }}>{finalCombo.location}</span>
           </span>
         )}
         <div>
@@ -568,9 +577,13 @@ function MovieSpinChallenge({ onBackToDashboard }) {
             className="btn"
             style={{
               marginTop: 13,
-              background: "#171e3b", color: "#ffd500",
-              border: "2px solid #ffd139", fontWeight: 700,
-              padding: "9px 18px", fontSize: "1.08rem"
+              background: "#232663",
+              color: "#fff700",
+              border: "2.5px solid #ffe43c",
+              fontWeight: 700,
+              padding: "9px 18px",
+              fontSize: "1.1rem",
+              textShadow: "0 1px 13px #ffe20099, 0 2px 18px #0f0f1a",
             }}
             onClick={() => {
               setShowRevealHighlight(false);
@@ -787,37 +800,54 @@ function MovieSpinChallenge({ onBackToDashboard }) {
       )}
       {/* Feedback/result */}
       {showResult && (
-        <div style={{
-          marginTop: 24,
-          fontWeight: 800,
-          fontSize: 17,
-          minHeight: 22,
-          textAlign: "center",
-          color: feedback.startsWith("✅") ? "#fff" : "#fff",
-          background: feedback.startsWith("✅") ? "#1f5f2e" : "#b31322",
-          borderRadius: 10,
-          boxShadow: "0 2px 14px #1d182830",
-          padding: "16px 6px 12px 6px",
-          textShadow: feedback.startsWith("✅")
-            ? "0 1.5px 10px #13e87a, 0 2px 18px #000c"
-            : "0 2px 10px #a80321, 0 6px 12px #fff3",
-          letterSpacing: ".018em"
-        }}>
-          {feedback}
+        <div
+          style={{
+            marginTop: 24,
+            fontWeight: 900,
+            fontSize: 18,
+            minHeight: 22,
+            textAlign: "center",
+            color: feedback.startsWith("✅") ? "#fff" : "#fff",
+            background: feedback.startsWith("✅") ? "#157f30" : "#c01528",
+            borderRadius: 13,
+            boxShadow: "0 2px 18px #11162b, 0 6px 17px #0f031344",
+            padding: "17px 8px 13px 8px",
+            textShadow: feedback.startsWith("✅")
+              ? "0 2px 13px #ffe900, 0 2px 18px #1f6600, 0 6px 10px #000b"
+              : "0 2px 10px #fffb0a, 0 6px 15px #fff3, 0 1px 15px #ed0b2155",
+            letterSpacing: ".022em",
+            border: "2.5px solid #ffec1a"
+          }}
+        >
+          <span style={{ color: feedback.startsWith("✅") ? "#ffff56" : "#fff362", fontWeight: 900 }}>
+            {feedback}
+          </span>
           {matchingMovie && (
-            <div style={{
-              marginTop: 16,
-              color: "#ffe63c",
-              fontSize: 19,
-              textShadow: "0 1px 11px #b08d08, 0 2px 15px #262101",
-              fontWeight: 700,
-            }}>
-              <b>✓ Example match:</b>
+            <div
+              style={{
+                marginTop: 16,
+                color: "#fff",
+                fontSize: 19,
+                textShadow: "0 1px 11px #ffe700, 0 2px 15px #262101, 0 1px 11px #000",
+                fontWeight: 900,
+                background: "#27260d",
+                borderRadius: 7,
+                padding: "8px 10px 7px 10px",
+                maxWidth: "350px",
+                marginLeft: "auto",
+                marginRight: "auto",
+                marginBottom: 10,
+                border: "1.7px solid #ffe086"
+              }}
+            >
+              <b style={{ color: "#ffe043" }}>✓ Example match:</b>
               <br />
-              <span style={{
-                color: "#fff", fontWeight: 900,
-                textShadow: "0 1px 11px #37b5ec,0 2px 9px #3aaad8a7"
-              }}>
+              <span
+                style={{
+                  color: "#fff", fontWeight: 900,
+                  textShadow: "0 1px 11px #37b5ec,0 2px 19px #2eaa5cb7,0 2px 8px #ffe424"
+                }}
+              >
                 {matchingMovie.title}
               </span>
               {matchingMovie.fullDetails && matchingMovie.fullDetails.poster_path && (
@@ -830,7 +860,7 @@ function MovieSpinChallenge({ onBackToDashboard }) {
                     width: 68,
                     height: 98,
                     borderRadius: 6,
-                    border: "2.5px solid #b7ecf5",
+                    border: "2.5px solid #fff544",
                   }}
                 />
               )}
@@ -842,25 +872,29 @@ function MovieSpinChallenge({ onBackToDashboard }) {
               onClick={resetGame}
               style={{
                 marginRight: 10,
-                background: "#1871ad",
-                color: "#fff",
-                fontWeight: 700,
-                border: "2px solid #5eb3f1",
-                textShadow: "0 2px 12px #0063b4, 0 1px 18px #c8eaff55",
-              }}>
+                background: "#23394c",
+                color: "#ffe600",
+                fontWeight: 900,
+                border: "2.5px solid #ffe86d",
+                textShadow: "0 2px 12px #ffe135, 0 1px 13px #323c44",
+                fontSize: "1.08rem",
+              }}
+            >
               Play Again
             </button>
             <button
               className="btn"
               onClick={onBackToDashboard}
               style={{
-                background: "#272b2f",
-                color: "#ffe800",
-                fontWeight: 700,
-                marginLeft: 6,
-                border: "2px solid #b8ad38",
-                textShadow: "0 1px 10px #17180b, 0 0px 18px #fff13d44"
-              }}>
+                background: "#282700",
+                color: "#fff700",
+                fontWeight: 900,
+                marginLeft: 8,
+                border: "2.5px solid #ffe43a",
+                textShadow: "0 1px 10px #ffe223, 0 0px 18px #fff13d44",
+                fontSize: "1.08rem",
+              }}
+            >
               Back to Dashboard
             </button>
           </div>
