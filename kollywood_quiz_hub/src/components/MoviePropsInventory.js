@@ -158,20 +158,16 @@ function MoviePropsInventory({ onBackToDashboard }) {
 
   // PUBLIC_INTERFACE - Reveal handler
   function handleReveal() {
+    // Reveal mode is now permanent for this round
     setReveal(true);
     const correctTitle = quizRounds[step].answer;
-    setShowFeedback({ correct: false, correctTitle });
+    setShowFeedback(null); // Ignore old feedback
     setUserAnswers(prev => [
       ...prev,
       { guess: "", correct: correctTitle, wasCorrect: false, revealed: true }
     ]);
-    setTimeout(() => {
-      setShowFeedback(null);
-      setUserInput("");
-      setReveal(false);
-      if (step + 1 === QUESTIONS) setQuizOver(true);
-      else setStep(step + 1);
-    }, 1800);
+    // Do not autosubmit or proceed, just reveal and lock
+    // Don't allow guessing or submit for this step now
   }
 
   // Render the prop clue box for 4 strong-styled emoji clues
@@ -337,7 +333,9 @@ function MoviePropsInventory({ onBackToDashboard }) {
             fontWeight: 800,
             fontSize: 15,
             marginLeft: 3,
-            letterSpacing: ".01em"
+            letterSpacing: ".01em",
+            opacity: reveal ? 0.6 : 1,
+            cursor: reveal ? "not-allowed" : "pointer"
           }}
           onClick={handleReveal}
           disabled={reveal || !!showFeedback}
@@ -346,7 +344,30 @@ function MoviePropsInventory({ onBackToDashboard }) {
         </button>
       </div>
       {/* Feedback area */}
-      {showFeedback && (
+      {reveal ? (
+        <div
+          style={{
+            marginTop: 19,
+            marginBottom: 11,
+            fontWeight: 900,
+            fontSize: 22,
+            color: "#e67e00",
+            textShadow: "0 1.5px 15px #fff47b,0 1.5px 12px #381b00c9",
+            background: "#fffbe0",
+            borderRadius: 8,
+            padding: "12px 22px",
+            display: "inline-block",
+            letterSpacing: ".01em",
+            border: "3px solid #ffe336"
+          }}
+          aria-live="assertive"
+        >
+          <span role="img" aria-label="clap">🎉</span> The answer is:&nbsp;
+          <span style={{ color: "#d84a06", fontWeight: 900, fontSize: 25, textShadow: "0 1.5px 10px #feba68" }}>
+            {quizRounds[step].answer}
+          </span>
+        </div>
+      ) : showFeedback && (
         <div
           style={{
             marginTop: 19,
@@ -367,7 +388,7 @@ function MoviePropsInventory({ onBackToDashboard }) {
         >
           {showFeedback.correct
             ? <>✔️ <span style={{ color: "#04608c" }}>Correct!</span> The movie was: <span style={{ color: "#e3a813" }}>{showFeedback.correctTitle}</span></>
-            : <>✖️ <span style={{ color: "#a43424" }}>Incorrect.</span> {!reveal && <>The answer: <span style={{ color: "#e99113" }}>{showFeedback.correctTitle}</span></>}</>
+            : <>✖️ <span style={{ color: "#a43424" }}>Incorrect.</span> The answer: <span style={{ color: "#e99113" }}>{showFeedback.correctTitle}</span></>
           }
         </div>
       )}
