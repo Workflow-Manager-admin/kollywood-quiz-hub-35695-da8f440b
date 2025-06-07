@@ -47,13 +47,15 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     setLoading(true);
     fetchKollywoodMovies()
       .then((allMovies) => {
-        // 1. Build array of only real (character, movie) pairs where the movie exists in TMDB
+        // 1. Build array of only real (character, movie) pairs where the movie exists in TMDB AND has a poster (for proper UI)
         const movieTitleToObj = {};
         allMovies.forEach((movie) => {
-          movieTitleToObj[movie.title] = movie;
+          if (movie.title && movie.poster_path) {
+            movieTitleToObj[movie.title] = movie;
+          }
         });
 
-        // Only push genuine pairings from CHARACTERS; don't supplement with fake pairs.
+        // Only push genuine pairings from CHARACTERS; exclude those where poster is not available in TMDB
         const validPairs = [];
         CHARACTERS.forEach((char) => {
           char.movies.forEach((mov) => {
@@ -67,10 +69,29 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           });
         });
 
-        // If not enough valid pairs, use as many as we have.
-        const selectedPairs = validPairs
+        // If not enough valid pairs, use as many as we have, but always ensure at least one.
+        let selectedPairs = validPairs
           .sort(() => 0.5 - Math.random())
           .slice(0, QUESTIONS);
+
+        // If we have no valid pairs (API/data error), generate a dummy fallback question
+        if (selectedPairs.length === 0) {
+          // Try to use random movies as fake chars if available, else hard code fallback
+          const fallbackMovies = allMovies.filter(m => !!m.title && !!m.poster_path);
+          if (fallbackMovies.length > 0) {
+            selectedPairs = [{
+              character: "Fallback Character",
+              movie: fallbackMovies[0].title,
+              movieObj: fallbackMovies[0]
+            }];
+          } else {
+            selectedPairs = [{
+              character: "Fallback Char",
+              movie: "Unavailable Movie",
+              movieObj: { title: "Unavailable Movie", poster_path: "", id: -1 }
+            }];
+          }
+        }
 
         // Prepare a set of all movies that can be used as distractors (with poster & title, not the correct answer)
         const distractorPool = allMovies.filter(
@@ -93,22 +114,26 @@ function CharacterMovieMatch({ onBackToDashboard }) {
           // Shuffle to pick random distractors
           possibleDistractors = possibleDistractors.sort(() => 0.5 - Math.random());
 
-          // Pick two distractors
+          // Pick two distractors, fallback to as many as possible
           const distractorOptions = possibleDistractors.slice(0, CHOICES_PER_QUESTION - 1).map(m => ({
             movie: m.title,
             movieObj: m
           }));
 
-          // Always include correct answer option as object
+          // Always include correct answer option as object (may fallback)
           const correctOption = {
             movie: pair.movieObj.title,
             movieObj: pair.movieObj
           };
 
-          // Combine and shuffle options
-          const options = [correctOption, ...distractorOptions].sort(() => 0.5 - Math.random());
+          // Combine and shuffle options, but only use as many as possible (never <1)
+          let options = [correctOption, ...distractorOptions].sort(() => 0.5 - Math.random());
+          if (options.length === 0) {
+            // Absolute fallback - should never happen, but just in case
+            options = [{ movie: correctOption.movie, movieObj: correctOption.movieObj }];
+          }
 
-          // Guarantee there are only CHOICES_PER_QUESTION options
+          // Guarantee there are only CHOICES_PER_QUESTION options or as many as possible, but never empty
           return {
             character: pair.character,
             correctMovie: correctMovieTitle,
@@ -177,7 +202,19 @@ function CharacterMovieMatch({ onBackToDashboard }) {
         game="Character-Movie Match"
       />
     );
-  if (!questions[step]) return null;
+  // Instead of returning null, render a user-friendly error if something went wrong
+  if (!questions[step]) {
+    return (
+      <div className="container" style={{ paddingTop: 120 }}>
+        <h2 className="title" style={{ fontSize: "1.2em" }}>Character-Movie Match</h2>
+        <div className="description" style={{ color: "#b72d2d", marginBottom: 20 }}>
+          Sorry, could not load quiz questions for this game.<br />
+          Please try reloading the page, or pick a different quiz game from the dashboard.
+        </div>
+        <button className="btn btn-large" onClick={onBackToDashboard}>Back to Dashboard</button>
+      </div>
+    );
+  }
 
   // Display question: show the character and randomized movie choices; correct answer MUST always be present among the choices.
   return (
