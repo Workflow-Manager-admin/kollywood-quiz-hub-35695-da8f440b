@@ -38,18 +38,44 @@ function CharacterMovieMatch({ onBackToDashboard }) {
     setLoading(true);
     fetchKollywoodMovies()
       .then((all) => {
-        // Pick 10 random, associate with a char
-        const shuffled = all.sort(() => 0.5 - Math.random()).slice(0, QUESTIONS);
-        const qs = shuffled.map((movie, i) => {
-          const chars =
-            CHARACTERS.find((c) => c.movies.includes(movie.title))?.name ||
-            CHARACTERS[i % CHARACTERS.length].name;
-          return {
-            character: chars,
-            movie: movie.title,
-            movieObj: movie,
-          };
+        // Step 1: For eligible TMDB movies, find those with a known CHARACTERS mapping
+        const matchedPairs = [];
+        all.forEach(movie => {
+          const charObj = CHARACTERS.find((c) => c.movies.includes(movie.title));
+          if (charObj) {
+            matchedPairs.push({
+              character: charObj.name,
+              movie: movie.title,
+              movieObj: movie
+            });
+          }
         });
+
+        // Step 2: Shuffle and pick QUESTIONS count pairs
+        let qs;
+        if (matchedPairs.length >= QUESTIONS) {
+          qs = matchedPairs.sort(() => 0.5 - Math.random()).slice(0, QUESTIONS);
+        } else {
+          // If not enough matches (rare), fill remaining with randoms but guarantee mapping
+          const extraNeeded = QUESTIONS - matchedPairs.length;
+          qs = [...matchedPairs];
+          // Pick movies from all without repeats, assign CHARACTERS round-robin
+          let alreadyUsed = new Set(qs.map(q => q.movie));
+          let index = 0;
+          for (let i = 0; i < all.length && qs.length < QUESTIONS; ++i) {
+            const movie = all[i];
+            if (!alreadyUsed.has(movie.title)) {
+              const charIdx = index % CHARACTERS.length;
+              qs.push({
+                character: CHARACTERS[charIdx].name,
+                movie: movie.title,
+                movieObj: movie
+              });
+              alreadyUsed.add(movie.title);
+              index++;
+            }
+          }
+        }
         setQuestions(qs);
         setLoading(false);
       })
